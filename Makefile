@@ -27,7 +27,7 @@ SOURCES = $(wildcard *.cpp)
 INCLUDEDIRS = $(SMITHLAB_CPP) $(METHPIPE_ROOT)/src/common
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
-LIBS += -lgsl -lgslcblas -lefence
+LIBS += # -lgsl -lgslcblas -lefence
 
 CXX = g++
 CXXFLAGS = -Wall -fmessage-length=50
