@@ -20,7 +20,7 @@ ifndef SMITHLAB_CPP
 $(error Must define SMITHLAB_CPP variable)
 endif
 
-PROGS = tsscpgplot roimethstat2
+PROGS = tsscpgplot roimethstat2 collapsebed
 
 SOURCES = $(wildcard *.cpp)
 
@@ -52,8 +52,6 @@ $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 	smithlab_utils.o OptionParser.o)
 
 tsscpgplot roimethstat2: $(addprefix $(METHPIPE_ROOT)/src/common/, MethpipeFiles.o)
-
-resample_methylome: $(addprefix $(SMITHLAB_CPP)/, RNG.o MappedRead.o)
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
