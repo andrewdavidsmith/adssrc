@@ -20,7 +20,7 @@ ifndef SMITHLAB_CPP
 $(error Must define SMITHLAB_CPP variable)
 endif
 
-PROGS = tsscpgplot roimethstat2 collapsebed
+PROGS = tsscpgplot roimethstat2 collapsebed countoverlaps
 
 SOURCES = $(wildcard *.cpp)
 
