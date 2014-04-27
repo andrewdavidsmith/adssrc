@@ -20,14 +20,17 @@ ifndef SMITHLAB_CPP
 $(error Must define SMITHLAB_CPP variable)
 endif
 
-PROGS = tsscpgplot roimethstat2 collapsebed countoverlaps
-
+PROGS = collapsebed countoverlaps 
 SOURCES = $(wildcard *.cpp)
+INCLUDEDIRS = $(SMITHLAB_CPP)
+LIBS = -lgsl -lgslcblas # -lefence
 
-INCLUDEDIRS = $(SMITHLAB_CPP) $(METHPIPE_ROOT)/src/common
+ifdef METHPIPE_ROOT
+PROGS += tsscpgplot roimethstat2 smoothmeth
+INCLUDEDIRS += $(METHPIPE_ROOT)/src/common
+endif
+
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
-
-LIBS += # -lgsl -lgslcblas -lefence
 
 CXX = g++
 CXXFLAGS = -Wall -fmessage-length=50
@@ -51,7 +54,10 @@ all: $(PROGS)
 $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 	smithlab_utils.o OptionParser.o)
 
-tsscpgplot roimethstat2: $(addprefix $(METHPIPE_ROOT)/src/common/, MethpipeFiles.o)
+tsscpgplot roimethstat2 smoothmeth: \
+	$(addprefix $(METHPIPE_ROOT)/src/common/, MethpipeFiles.o)
+
+smoothmeth: $(addprefix $(METHPIPE_ROOT)/src/common/, TwoStateHMM.o)
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
