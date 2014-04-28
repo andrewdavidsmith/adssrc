@@ -20,3 +20,12 @@ the read is lower than 0.5. If so, then the states are inverted: all C changed
 to T, and all T changed to C. Then the epiread is printed to a file or stdout.
 If you don't know why this might be a useful thing to do, then you probably
 don't need to do it.
+
+roimethstat2
+============
+
+In theory this program will do the identical computation that the roimethstat
+program from methpipe does... The difference is that when you have only few
+regions of interest, rather than loading the entire file of single-site methylation
+levels, the ones that are required are found by doing a binary search on disk
+for the proper location.
