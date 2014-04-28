@@ -20,7 +20,8 @@ ifndef SMITHLAB_CPP
 $(error Must define SMITHLAB_CPP variable)
 endif
 
-PROGS = collapsebed countoverlaps 
+PROGS = collapsebed countoverlaps majormethstate
+
 SOURCES = $(wildcard *.cpp)
 INCLUDEDIRS = $(SMITHLAB_CPP)
 LIBS = -lgsl -lgslcblas # -lefence
