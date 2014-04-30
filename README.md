@@ -40,3 +40,11 @@ and the posterior probabilities for state occupancy at any CpG site are extracte
 the HMM. So if p is the posterior for being in the high methylation state, and h is the
 methylation level for the "high" state and l is the methylation level for the "low"
 state, then the smoothed level is ph + (1 - p)*l.
+
+tsscpgplot
+==========
+
+I use this program to make meta-gene plots of methylation levels around transcription
+start sites (TSS) but also around other fixed landmarks in the genome. The program
+takes a BED format file, and processes it in a stranded way, but currently it only
+works if the BED interval is a single site, so the interval has size 1.
