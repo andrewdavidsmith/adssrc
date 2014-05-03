@@ -34,7 +34,7 @@ endif
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
 CXX = g++
-CXXFLAGS = -Wall -fmessage-length=50
+CXXFLAGS = -Wall -Wextra -fmessage-length=50
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
 
@@ -43,7 +43,6 @@ CFLAGS += -arch x86_64
 endif
 
 # Flags passed to the C++ compiler.
-CXXFLAGS += -g -Wall -Wextra
 ifeq "$(shell uname)" "Darwin"
 CXXFLAGS += -arch x86_64
 ifeq "$(shell if [ `sysctl -n kern.osrelease | cut -d . -f 1` -ge 13 ];\
