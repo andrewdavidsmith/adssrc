@@ -61,7 +61,7 @@ process_chrom(const size_t region_size,
     GenomicRegion b(tss[i]);
     b.set_end(b.get_end() + region_size);
     b.set_start(b.get_end() - 1);
-	  
+    
     const size_t left = a.get_start();
     const size_t right = left + 2*region_size;
     vector<GenomicRegion>::const_iterator start(find_closest(cpg, a));
@@ -237,6 +237,13 @@ int main(int argc, const char **argv) {
     if (!outfile.empty()) of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
+    if (VERBOSE)
+      cerr << "format: "
+	   << "position" << '\t'
+	   << "fraction_of_tss" << '\t'
+	   << "fraction_of_counts" << '\t'
+	   << "counts" << endl;
+    
     for (size_t i = 0; i < totals.size(); ++i)
       out << i << "\t" 
 	  << counts[i]/double(total_tss) << "\t" 
