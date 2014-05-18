@@ -1,7 +1,7 @@
 adssrc
 ======
 
-Some of the code I use in my own data analysis.
+Some of the code I use in my own data analysis. Some of this might make it into smithlabcode repositories eventually.
 
 collapsebed
 ===========
