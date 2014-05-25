@@ -27,7 +27,7 @@ INCLUDEDIRS = $(SMITHLAB_CPP)
 LIBS = -lgsl -lgslcblas # -lefence
 
 ifdef METHPIPE_ROOT
-PROGS += tsscpgplot roimethstat2 smoothmeth
+PROGS += tsscpgplot roimethstat2 smoothmeth methcounts2
 INCLUDEDIRS += $(METHPIPE_ROOT)/src/common
 endif
 
@@ -64,8 +64,10 @@ all: $(PROGS)
 $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 	smithlab_utils.o OptionParser.o)
 
-tsscpgplot roimethstat2 smoothmeth: \
+tsscpgplot roimethstat2 smoothmeth methcounts2: \
 	$(addprefix $(METHPIPE_ROOT)/src/common/, MethpipeFiles.o)
+
+methcounts2: $(addprefix $(SMITHLAB_CPP)/, MappedRead.o)
 
 smoothmeth: $(addprefix $(METHPIPE_ROOT)/src/common/, TwoStateHMM.o)
 
