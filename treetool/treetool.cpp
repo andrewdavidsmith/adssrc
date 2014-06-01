@@ -20,6 +20,37 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
+/*
+
+  ABOUT NEWICK FORMAT
+  -------------------
+
+  The following should all be legal, according to wikipedia.
+
+  (,,(,));                               no nodes are named
+  (A,B,(C,D));                           leaf nodes are named
+  (A,B,(C,D)E)F;                         all nodes are named
+  (:0.1,:0.2,(:0.3,:0.4):0.5);           all but root node have a distance to parent
+  (:0.1,:0.2,(:0.3,:0.4):0.5):0.0;       all have a distance to parent
+  (A:0.1,B:0.2,(C:0.3,D:0.4):0.5);       distances and leaf names (popular)
+  (A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;     distances and all names
+  ((B:0.2,(C:0.3,D:0.4)E:0.5)F:0.1)A;    a tree rooted on a leaf node (rare)
+  
+  ========================================================================
+
+  (1) It seems like a tree always ends in a semicolon
+  (2) Trees need not be binary, but usually are ***
+  (3) Since the code needs to have uniform nodes, we will always have
+      a distance, even for the root, but this will be 0.0
+  (4) The parsing will look for commas, but not within parentheses
+  (5) No whitespace will be allowed. It will be removed initially
+  (6) There is a question of whether to allow commas or colons inside
+      names, for example by using quotes around the names or trying to
+      parse intelligently
+
+*/
+
 #include <string>
 #include <vector>
 #include <iostream>
@@ -27,17 +58,34 @@
 #include <algorithm>
 #include <numeric>
 
+#include <cctype> // for isspace
+
+
 #include "OptionParser.hpp"
 #include "smithlab_utils.hpp"
 #include "smithlab_os.hpp"
+
 
 using std::string;
 using std::vector;
 using std::endl;
 using std::cerr;
 
+
+static bool
+check_balanced_parentheses(const string &s) {
+  int count = 0;
+  for (size_t i = 0; i < s.length() && count >= 0; ++i) {
+    if (s[i] == '(') ++count;
+    if (s[i] == ')') --count;
+  }
+  return count == 0;
+}
+
+
 class PhyloTreeNode {
 public:
+  PhyloTreeNode() {}
   PhyloTreeNode(const double bl) : branch_length(bl) {}
   PhyloTreeNode(const string &subtree_string);
   
@@ -53,51 +101,70 @@ private:
   
 };
 
+
 static bool
-represents_leaf(const string &subtree_rep) {
+represents_leaf(const string &tree_rep) {
   return true;
 }
 
+
 static string
-extract_name(const string &subtree_rep) {
+extract_name(const string &tree_rep) {
   return string();
 }
 
+
 static double
-extract_branch_length(const string &subtree_rep) {
+extract_branch_length(const string &tree_rep) {
   return 0.0;
 }
 
+
 static bool
-root_has_name(const string &subtree_rep) {
+root_has_name(const string &tree_rep) {
   return true;
 }
 
-static string
-extract_left_subtree(const string &subtree_rep) {
-  return string();
+
+static void
+extract_subtrees(const string &tree_rep,
+		 vector<string> &sub_subtree_reps) {
+  return;
 }
 
-static string
-extract_right_subtree(const string &subtree_rep) {
-  return string();
-}
 
-PhyloTreeNode::PhyloTreeNode(const string &subtree_rep) {
+PhyloTreeNode::PhyloTreeNode(const string &tree_rep) {
   // This function needs to test the various ways that a string can be
   // passed in to represent a subtree at the current node
   
-  branch_length = extract_branch_length(subtree_rep);
-  if (root_has_name(subtree_rep))
-    name = extract_name(subtree_rep);
-  
-  if (!represents_leaf(subtree_rep)) {
-    const string left_subtree_rep = extract_left_subtree(subtree_rep);
-    child.push_back(PhyloTreeNode(left_subtree_rep));
-    const string right_subtree_rep = extract_right_subtree(subtree_rep);
-    child.push_back(PhyloTreeNode(right_subtree_rep));
+  branch_length = extract_branch_length(tree_rep);
+  if (root_has_name(tree_rep))
+    name = extract_name(tree_rep);
+
+  if (!represents_leaf(tree_rep)) {
+    vector<string> subtree_reps;
+    extract_subtrees(tree_rep, subtree_reps);
+    for (size_t i = 0; i < subtree_reps.size(); ++i)
+      child.push_back(PhyloTreeNode(subtree_reps[i]));
   }
 }
+
+
+class PhyloTree {
+public:
+  PhyloTree(string tree_rep) {
+    check_balanced_parentheses(tree_rep);
+    // remove whitespace
+    string::iterator w = std::remove_copy_if(tree_rep.begin(), tree_rep.end(),
+					     tree_rep.begin(), &isspace);
+    assert(w != tree_rep.begin());
+    tree_rep.erase(--w, tree_rep.end()); // The "--" is for the ";"
+    root = PhyloTreeNode(tree_rep);
+  }
+private:
+  PhyloTreeNode root;
+};
+
 
 int 
 main(int argc, const char **argv) {
