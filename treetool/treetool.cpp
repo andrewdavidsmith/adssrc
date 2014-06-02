@@ -94,6 +94,7 @@ public:
   bool is_leaf() const {return child.empty();}
   
   string tostring(const size_t depth = 0) const;
+  string Newick_format() const;
 
 private:
   vector<PhyloTreeNode> child;
@@ -102,12 +103,28 @@ private:
   
 };
 
+
 string
 PhyloTreeNode::tostring(const size_t depth) const {
   std::ostringstream oss;
   oss << string(depth, '\t') << name << ':' << branch_length;
   for (size_t i = 0; i < child.size(); ++i)
     oss << endl << child[i].tostring(depth + 1);
+  return oss.str();
+}
+
+
+string
+PhyloTreeNode::Newick_format() const {
+  std::ostringstream oss;
+  if (!child.empty()) {
+    oss << '(';
+    oss << child.front().Newick_format();
+    for (size_t i = 1; i < child.size(); ++i)
+      oss << ',' << child[i].Newick_format();
+    oss << ')';
+  }
+  oss << name << ':' << branch_length;
   return oss.str();
 }
 
@@ -195,29 +212,27 @@ PhyloTreeNode::PhyloTreeNode(const string &tree_rep) {
 
 class PhyloTree {
 public:
+  PhyloTree() {}
   PhyloTree(string tree_rep) {
     check_balanced_parentheses(tree_rep);
     // remove whitespace
     string::iterator w = std::remove_copy_if(tree_rep.begin(), tree_rep.end(),
 					     tree_rep.begin(), &isspace);
     assert(w != tree_rep.begin());
-    tree_rep.erase(--w, tree_rep.end()); // The "--" is for the ";"
+    tree_rep.erase(--w, tree_rep.end()); // The "--w" is for the ";"
     root = PhyloTreeNode(tree_rep);
   }
   string tostring() const {return root.tostring();}
+  string Newick_format() const {return root.Newick_format() + ";";}
 
 private:
   PhyloTreeNode root;
 };
 
 
-static string
-read_tree_from_file(const string &newick_file) {
-  std::ifstream in(newick_file.c_str());
-  if (!in)
-    throw SMITHLABException("bad file: " + newick_file);
-  
-  /* doing it this way to just get one tree */
+std::istream&
+operator>>(std::istream &in, PhyloTree &t) {
+  /* doing it this way to just get one tree at a time */
   string r;
   char c;
   bool found_end = false;
@@ -226,7 +241,16 @@ read_tree_from_file(const string &newick_file) {
     if (c == ';')
       found_end = true;
   }
-  return r;
+  if (!found_end)
+    throw SMITHLABException("bad tree format");
+  t = PhyloTree(r);
+  return in;
+}
+
+
+std::ostream&
+operator<<(std::ostream &out, const PhyloTree &t) {
+  return out << t.Newick_format();
 }
 
 
@@ -266,15 +290,16 @@ main(int argc, const char **argv) {
     const string newick_file = leftover_args.front();
     /****************** END COMMAND LINE OPTIONS *****************/
 
-    const string tree_rep(read_tree_from_file(newick_file));
+    std::ifstream in(newick_file.c_str());
+    if (!in)
+      throw SMITHLABException("bad file: " + newick_file);
     
-    if (VERBOSE)
-      cerr << tree_rep << endl;
-    
-    const PhyloTree t(tree_rep);
+    PhyloTree t;
+    in >> t;
     
     cout << t.tostring() << endl;
     
+    cout << t << endl;
   }
   catch (const SMITHLABException &e) {
     cerr << e.what() << endl;
