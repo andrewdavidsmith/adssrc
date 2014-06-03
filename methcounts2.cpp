@@ -108,7 +108,9 @@ struct CountSet {
     else if (x == 'A') ++nA;
     else ++N;
   }
-  
+  count_type pos_total() const {return pA + pC + pG + pT;}
+  count_type neg_total() const {return nA + nC + nG + nT;}
+
   count_type unconverted_cytosine() const {return pC;}
   count_type converted_cytosine() const {return pT;}
   count_type unconverted_guanine() const {return nC;}
@@ -171,14 +173,17 @@ count_states_neg(const string &chrom, const MappedRead &r,
 }
 
 
-/* This "has_mutated" function looks on the opposite strand to see if
- * the apparent conversion from C->T was actually already in the DNA
- * because of a mutation or SNP.
+/* This "has_mutated" function looks on the opposite strand to see
+ * if the apparent conversion from C->T was actually already in the
+ * DNA because of a mutation or SNP.
  */
 template <class count_type>
 static bool
 has_mutated(const char base, const CountSet<count_type> &cs) {
-  return is_cytosine(base) ? (cs.nA > 2*(cs.nG + 1)) : (cs.pT > 2*(cs.pC + 1));
+  static const double MUTATION_DEFINING_FRACTION = 0.5;
+  return is_cytosine(base) ? 
+    (cs.nG < MUTATION_DEFINING_FRACTION*(cs.neg_total())) : 
+    (cs.pG < MUTATION_DEFINING_FRACTION*(cs.pos_total()));
 }
 
 
