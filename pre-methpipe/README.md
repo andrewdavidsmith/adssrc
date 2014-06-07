@@ -1,4 +1,4 @@
-PRE-METHPIPE
+pre-methpipe
 ============
 
 This directory is my own staging ground for improvements to specific programs
