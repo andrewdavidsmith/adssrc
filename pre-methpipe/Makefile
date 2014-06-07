@@ -64,12 +64,10 @@ all: $(PROGS)
 $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 	smithlab_utils.o OptionParser.o)
 
-tsscpgplot roimethstat2 smoothmeth methcounts2 allelicmeth2: \
+methcounts2: \
 	$(addprefix $(METHPIPE_ROOT)/src/common/, MethpipeFiles.o)
 
-methcounts2: $(addprefix $(SMITHLAB_CPP)/, MappedRead.o)
-
-smoothmeth: $(addprefix $(METHPIPE_ROOT)/src/common/, TwoStateHMM.o)
+bsrate2 methcounts2: $(addprefix $(SMITHLAB_CPP)/, MappedRead.o)
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
