@@ -255,7 +255,7 @@ main(int argc, const char **argv) {
   try {
     
     bool VERBOSE = false;
-    bool ALL_SITES = true;
+    bool ALL_SITES = false;
     
     string chrom_file;
     string outfile;
@@ -271,7 +271,7 @@ main(int argc, const char **argv) {
     opt_parse.add_opt("suffix", 's', "suffix of FASTA files "
 		      "(assumes -c specifies dir)", false , fasta_suffix);
     opt_parse.add_opt("all", 'a', "print all sites including uncovered ones",
-                      true, ALL_SITES);
+                      false, ALL_SITES);
     opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -321,7 +321,7 @@ main(int argc, const char **argv) {
 	  throw SMITHLABException("chroms out of order: " + mapped_reads_file);
 	
 	if (!counts.empty()) // if we have results, output them
-	  write_output(out, chrom_region.get_chrom(), chrom, counts);
+	  write_output(out, chrom_region.get_chrom(), chrom, counts, ALL_SITES);
 	
 	// load the new chromosome and reset the counts
 	get_chrom(mr, chrom_files, chrom_region, chrom);
