@@ -191,7 +191,8 @@ template <class count_type>
 static void
 write_output(std::ostream &out,
 	     const string &chrom_name, const string &chrom, 
-	     const vector<CountSet<count_type> > &counts) {
+	     const vector<CountSet<count_type> > &counts,
+             bool ALL_SITES) {
   
   for (size_t i = 0; i < counts.size(); ++i) {
     const char base = chrom[i];
@@ -203,8 +204,10 @@ write_output(std::ostream &out,
       const double meth = unconverted/(converted + unconverted);
       const string tag = get_methylation_context_tag(chrom, i) + 
 	(has_mutated(base, counts[i]) ? "x" : "");
-      methpipe::write_site(out, chrom_name, i, (is_cytosine(base) ? "+" : "-"),
+      if (ALL_SITES || converted + unconverted > 0) {
+        methpipe::write_site(out, chrom_name, i, (is_cytosine(base) ? "+" : "-"),
 			   tag, meth, converted + unconverted);
+      }
     }
   }
 }
@@ -252,6 +255,7 @@ main(int argc, const char **argv) {
   try {
     
     bool VERBOSE = false;
+    bool ALL_SITES = false;
     
     string chrom_file;
     string outfile;
@@ -266,6 +270,8 @@ main(int argc, const char **argv) {
 		      ".fa suffix)", true , chrom_file);
     opt_parse.add_opt("suffix", 's', "suffix of FASTA files "
 		      "(assumes -c specifies dir)", false , fasta_suffix);
+    opt_parse.add_opt("all", 'a', "print all sites including uncovered ones",
+                      false, ALL_SITES);
     opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -315,7 +321,7 @@ main(int argc, const char **argv) {
 	  throw SMITHLABException("chroms out of order: " + mapped_reads_file);
 	
 	if (!counts.empty()) // if we have results, output them
-	  write_output(out, chrom_region.get_chrom(), chrom, counts);
+	  write_output(out, chrom_region.get_chrom(), chrom, counts, ALL_SITES);
 	
 	// load the new chromosome and reset the counts
 	get_chrom(mr, chrom_files, chrom_region, chrom);
@@ -330,7 +336,7 @@ main(int argc, const char **argv) {
       else count_states_neg(chrom, mr, counts);
     }
     if (!counts.empty()) // if we have results, output them
-      write_output(out, chrom_region.get_chrom(), chrom, counts);
+      write_output(out, chrom_region.get_chrom(), chrom, counts, ALL_SITES);
   }
   catch (const SMITHLABException &e) {
     cerr << e.what() << endl;
