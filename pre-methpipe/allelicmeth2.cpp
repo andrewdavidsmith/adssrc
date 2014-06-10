@@ -95,26 +95,28 @@ log_sum_log(const double p, const double q) {
 }
 
 
+// p(k) =  C(n1, k) C(n2, t - k) / C(n1 + n2, t)
 static double
-log_hyper_g(const size_t a, const size_t b, 
-	    const size_t c, const size_t d) {
-  return gsl_sf_lnfact(a + b) + gsl_sf_lnfact(c + d) + 
-    gsl_sf_lnfact(a + c) + gsl_sf_lnfact(b + d) -
-    gsl_sf_lnfact(a + b + c + d) - gsl_sf_lnfact(a) - 
-    gsl_sf_lnfact(b) - gsl_sf_lnfact(c) - gsl_sf_lnfact(d);
+log_hyper_g(const size_t k, const size_t n1, const size_t n2, const size_t t) {
+  return (gsl_sf_lnfact(n1) - gsl_sf_lnfact(k) - gsl_sf_lnfact(n1 - k) +
+  	  gsl_sf_lnfact(n2) - gsl_sf_lnfact(t - k) - gsl_sf_lnfact(n2 - (t - k)) -
+  	  (gsl_sf_lnfact(n1 + n2) - gsl_sf_lnfact(t) - gsl_sf_lnfact(n1 + n2 - t)));
 }
 
 
 static double
-test_similar_population(size_t a, size_t b, size_t c, size_t d) {
-  double p = 0;
-  p = log_sum_log(p, log_hyper_g(a, b, c, d));
-  while (b > 0 && c > 0) {
-    ++a; --b;
-    --c; ++d;
-    p = log_sum_log(p, log_hyper_g(a, b, c, d));
+fishers_exact(size_t a, size_t b, size_t c, size_t d) {
+  const size_t m = a + c; // sum of first column
+  const size_t n = b + d; // sum of second column
+  const size_t k = a + b; // sum of first row
+  const double observed = log_hyper_g(a, m, n, k);
+  double p = 0.0;
+  for (size_t i = (n > k ? 0ul : k - n); i <= std::min(k, m); ++i) {
+    const double curr = log_hyper_g(i, m, n, k);
+    if (curr <= observed)
+      p = log_sum_log(p, curr);
   }
-  return 2.0*exp(p);
+  return exp(p);
 }
 
 
@@ -146,7 +148,8 @@ struct PairStateCounter {
   T TT;
   
   double score() const {
-    return test_similar_population(CC, CT, TC, TT);
+    return (CC*TT > CT*TC) ?
+      fishers_exact(CC, CT, TC, TT) : fishers_exact(CT, CC, TT, TC);
   }
   double total() const {return CC + CT + TC + TT;}
   
