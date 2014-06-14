@@ -61,7 +61,6 @@
 
 #include <cctype> // for isspace
 
-
 #include "OptionParser.hpp"
 #include "smithlab_utils.hpp"
 #include "smithlab_os.hpp"
@@ -87,7 +86,6 @@ check_balanced_parentheses(const string &s) {
 class PhyloTreeNode {
 public:
   PhyloTreeNode() {}
-  PhyloTreeNode(const double bl) : branch_length(bl) {}
   PhyloTreeNode(const string &subtree_string);
   
   bool has_children() const {return !child.empty();}
@@ -95,19 +93,31 @@ public:
   
   string tostring(const size_t depth = 0) const;
   string Newick_format() const;
+  bool label_exists(const string &label) const;
 
 private:
   vector<PhyloTreeNode> child;
   string name;
   double branch_length; // distance to parent
-  
 };
+
+
+bool
+PhyloTreeNode::label_exists(const string &label) const {
+  if (name == label) return true;
+  else {
+    for (size_t i = 0; i < child.size(); ++i)
+      if (child[i].label_exists(label))
+	return true;
+    return false;
+  }
+}
 
 
 string
 PhyloTreeNode::tostring(const size_t depth) const {
   std::ostringstream oss;
-  oss << string(depth, '\t') << name << ':' << branch_length;
+  oss << string(depth, '\t') << branch_length << ':' << name;
   for (size_t i = 0; i < child.size(); ++i)
     oss << endl << child[i].tostring(depth + 1);
   return oss.str();
@@ -216,15 +226,19 @@ public:
   PhyloTree(string tree_rep) {
     check_balanced_parentheses(tree_rep);
     // remove whitespace
-    string::iterator w = std::remove_copy_if(tree_rep.begin(), tree_rep.end(),
-					     tree_rep.begin(), &isspace);
+    string::iterator w = 
+      std::remove_copy_if(tree_rep.begin(), tree_rep.end(),
+			  tree_rep.begin(), &isspace);
     assert(w != tree_rep.begin());
     tree_rep.erase(--w, tree_rep.end()); // The "--w" is for the ";"
     root = PhyloTreeNode(tree_rep);
   }
   string tostring() const {return root.tostring();}
   string Newick_format() const {return root.Newick_format() + ";";}
-
+  bool label_exists(const string &label) const {
+    return root.label_exists(label);
+  }
+  
 private:
   PhyloTreeNode root;
 };
@@ -261,12 +275,16 @@ main(int argc, const char **argv) {
     
     bool VERBOSE = false;
     string outfile;
+    string label_to_check;
     
     /****************** COMMAND LINE OPTIONS ********************/
     OptionParser opt_parse(strip_path(argv[0]), "manipulate Newick format "
-			   "phylogenetic trees" "<newick-input>");
+			   "phylogenetic trees",
+			   "<newick-input>");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
 		      false, outfile);
+    opt_parse.add_opt("label", 'l', "check if this label exists", 
+		      false, label_to_check);
     opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -298,8 +316,12 @@ main(int argc, const char **argv) {
     in >> t;
     
     cout << t.tostring() << endl;
-    
     cout << t << endl;
+    
+    if (!label_to_check.empty())
+      cout << label_to_check << " "
+	   << (t.label_exists(label_to_check) ? 
+	       "exists" : "does not exist") << endl;
   }
   catch (const SMITHLABException &e) {
     cerr << e.what() << endl;
