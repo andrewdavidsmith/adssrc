@@ -49,6 +49,11 @@
       names, for example by using quotes around the names or trying to
       parse intelligently
 
+  (7) Leaves should have proper names as unique identifiers, if not given in the 
+      newick string, we should name them properly. 
+  (8) For an internal node we can use the string representation of the 
+      subtree rooted at the node as its unique identifier.
+
 */
 
 #include <string>
@@ -94,6 +99,9 @@ public:
   string tostring(const size_t depth = 0) const;
   string Newick_format() const;
   bool label_exists(const string &label) const;
+  void fill_leaf_names(const string prefix, size_t &count);
+  void fill_names(const string prefix, size_t &count);
+
 
 private:
   vector<PhyloTreeNode> child;
@@ -110,6 +118,35 @@ PhyloTreeNode::label_exists(const string &label) const {
       if (child[i].label_exists(label))
 	return true;
     return false;
+  }
+}
+
+
+void 
+PhyloTreeNode::fill_leaf_names(const string prefix, size_t &count)  {
+  if(is_leaf()){
+    if(name.length()==0){
+      std::stringstream ss; ss << prefix << count;
+      name.assign( ss.str());
+      count ++; 
+    }
+  }else {
+    for(size_t i = 0; i < child.size(); ++i)
+      child[i].fill_leaf_names(prefix, count);
+  }
+}
+
+
+void 
+PhyloTreeNode::fill_names(const string prefix, size_t &count)  {
+  if(name.length()==0){
+    std::stringstream ss; ss << prefix << count;
+    name.assign( ss.str());
+    count ++; 
+  } 
+  if(!is_leaf()) {
+    for(size_t i = 0; i < child.size(); ++i)
+      child[i].fill_names(prefix, count);
   }
 }
 
@@ -238,10 +275,22 @@ public:
   bool label_exists(const string &label) const {
     return root.label_exists(label);
   }
-  
+  void fill_leaf_names(const string prefix, size_t &count); 
+  void fill_names(const string prefix, size_t &count);
+
 private:
   PhyloTreeNode root;
 };
+
+void
+PhyloTree::fill_leaf_names(const string prefix, size_t &count) {
+  root.fill_leaf_names(prefix, count);
+}
+
+void
+PhyloTree::fill_names(const string prefix, size_t &count) {
+  root.fill_names(prefix, count);
+}
 
 
 std::istream&
@@ -315,6 +364,13 @@ main(int argc, const char **argv) {
     PhyloTree t;
     in >> t;
     
+    cout << t.tostring() << endl;
+    cout << t << endl;
+
+    size_t count = 0;
+    t.fill_leaf_names("Leaf", count);
+    count = 0;
+    t.fill_names("Internal", count);  
     cout << t.tostring() << endl;
     cout << t << endl;
     
