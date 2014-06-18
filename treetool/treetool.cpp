@@ -101,22 +101,21 @@ public:
   string tostring(const string &label) const;
   string Newick_format() const;
   string Newick_format(const string & label) const;
-  string get_bitstring() const {return bitstring;}
+  string get_bitlabel() const {return bitlabel;}
   size_t get_leaf_num() const;
 
   void fill_leaf_names(const string prefix, size_t &count);
   void fill_names(const string prefix, size_t &count);
   
   void get_leaf_names(vector<string> &leaf_names);
-  bool find_common_ancestor(const vector<string> &leaf_names, 
-			    size_t &count, string &ancestor);
-  void set_bitstring(size_t &leaftracker, vector<string> &bitstrings);
+  size_t find_common_ancestor(const vector<string> &names, string &ancestor);
+  void set_bitlabel(size_t &leaftracker, vector<string> &bitlabels);
 
 private:
   vector<PhyloTreeNode> child;
   string name;
+  string bitlabel;
   double branch_length; // distance to parent
-  string bitstring;
 };
 
 
@@ -232,37 +231,21 @@ PhyloTreeNode::get_leaf_names(vector<string> &leaf_names){
 }
 
 
-/*After execution:
- *Count = number of hits by the descendant leaves given a target set of leaves;
- *Ancestor = empty string OR the nearest common ancestor of target leaves;
- *Return true if the ancestor has been found in the subtree rooted here
- */
-bool 
-PhyloTreeNode::find_common_ancestor(const vector<string> &leaf_names, 
-				    size_t &count, string &ancestor){
-  bool found=false;
-  if(count == leaf_names.size()){
-    assert(!ancestor.empty());
-    found = true; 
-  }else{
-    if(is_leaf()){
-      vector<string>::const_iterator it;
-      it = find(leaf_names.begin(),leaf_names.end(), name);
-      if( it != leaf_names.end()){
-	count = 1; 
-      }
-    } else{
-      vector<size_t> counts(child.size(), 0);
-      for(size_t i =0; i< child.size(); ++i)
-	found = child[i].find_common_ancestor(leaf_names, counts[i], ancestor);
-      count = std::accumulate(counts.begin(), counts.end(), 0); 
-    }
-    if(count == leaf_names.size()) found = true;
-    if(found && ancestor.empty())
-      ancestor = name; 
-  }
-  return found;
+size_t
+PhyloTreeNode::find_common_ancestor(const vector<string> &names, string &ancestor) {
+ 
+  size_t count = 0;
+  for (size_t i = 0; i < child.size() && ancestor.empty(); ++i)
+    count += child[i].find_common_ancestor(names, ancestor);
+  
+  count += find(names.begin(), names.end(), name) != names.end();
+  
+  if (ancestor.empty() && count == names.size())
+    ancestor = name;
+  
+  return count;
 }
+
 
 
 /*Return total number of leaf nodes in the descendants */
@@ -279,29 +262,29 @@ PhyloTreeNode::get_leaf_num() const{
 
 }
 
-/*Make bitstring labels:
- *Each leaf node is represented by a bitstring with exactly
- *one bit set to 1, depending on the visit order in a DF traverse;
- *A parent's bitstring is the OR operation result of all the children;
+/*Make bitlabel:
+ *Label leaf nodes with bitstrings, each having exactly
+ *one bit set to 1, depending on a DF traverse oreder;
+ *A parent's bitlabel is the OR operation result of all the children;
  *The first argument keeps track of total number of labeled leaves.  
- *The second argument is a collection of all bitstring labels assigned so far.
+ *The second argument is a collection of all bitlabels assigned so far.
  */
 void 
-PhyloTreeNode::set_bitstring(size_t &leaftracker, 
-			     vector<string> &bitstrings){
+PhyloTreeNode::set_bitlabel(size_t &leaftracker, 
+			     vector<string> &bitlabels){
   std::bitset<MAX_LEAF_NUM> bits;
   if(is_leaf()){
     bits.set(leaftracker);
     leaftracker ++;
   }else{
     for(size_t i =0; i< child.size();++i){
-      child[i].set_bitstring(leaftracker, bitstrings);
-      std::bitset<MAX_LEAF_NUM> tmp(child[i].get_bitstring());
+      child[i].set_bitlabel(leaftracker, bitlabels);
+      std::bitset<MAX_LEAF_NUM> tmp(child[i].get_bitlabel());
       bits |= tmp;
     }
   }
-  bitstring = bits.to_string<char,std::string::traits_type,std::string::allocator_type>();
-  bitstrings.push_back(bitstring);
+  bitlabel = bits.to_string<char,std::string::traits_type,std::string::allocator_type>();
+  bitlabels.push_back(bitlabel);
 }
 
 
@@ -409,14 +392,16 @@ public:
   void fill_leaf_names(const string prefix, size_t &count); 
   void fill_names(const string prefix, size_t &count);
   void get_leaf_names(vector<string> &leaf_names );
-  string find_common_ancestor(const vector<string> &leaf_names); 
+
+  bool find_common_ancestor(const vector<string> &names, string &ancestor);
+
   void build_neighbor();
   vector<vector<size_t> > get_neighbor()const{return neighbor;}
 private:
   PhyloTreeNode root;
   size_t leaf_num;
   vector<vector<size_t> > neighbor;
-  void set_bitstring(vector<string> &bitstrings);
+  void set_bitlabel(vector<string> &bitlabels);
   void set_leaf_num();
 
 };
@@ -447,26 +432,20 @@ PhyloTree::get_leaf_names(vector<string> & leaf_names){
   root.get_leaf_names(leaf_names);
 }
 
-/*Find the nearest common ancestor for a set of leaves in the tree
- *Return the name of their nearest common ancestor, if found;
- *Throw error if not found.
+/*Find the nearest common ancestor for a set of nodes in the tree
+ *Return true if found;
  */
-string
-PhyloTree::find_common_ancestor(const vector<string> &leaf_names){
-  vector<string> copy_names = leaf_names;
+bool
+PhyloTree::find_common_ancestor(const vector<string> &names, string &ancestor){
+  vector<string> copy_names = names;
   vector<string>::iterator it;
   it = std::unique(copy_names.begin(), copy_names.end());
   if(it != copy_names.end()){
     throw SMITHLABException("Names are not unique in query for common ancestor");
   }
-  size_t count = 0; //# of leaves found
-  string ancestor;
-  bool found = root.find_common_ancestor(leaf_names, count, ancestor);
-  if (!found)
-    throw SMITHLABException("Ancestor not found");
-  return ancestor;
+  size_t count = root.find_common_ancestor(names, ancestor);
+  return count==names.size();
 }
-
 
 /*Assign value to the private member leaf_num*/
 void
@@ -476,15 +455,14 @@ PhyloTree::set_leaf_num(){
     throw SMITHLABException("Number of leaves over MAX_LEAF_NUM");
 }
 
-/*Assign bitstring labels to nodes in the tree*/
+/*Assign bitlabels to nodes*/
 void 
-PhyloTree::set_bitstring(vector<string> &bitstrings){
+PhyloTree::set_bitlabel(vector<string> &bitlabels){
   size_t tracker = 0;
-  root.set_bitstring(tracker, bitstrings);
+  root.set_bitlabel(tracker, bitlabels);
 }
 
-
-/*Assign Neighbor relations basing on bitstring labels*/
+/*Assign Neighbor relations basing on bitlabels*/
 void 
 PhyloTree::build_neighbor(){
   set_leaf_num();
@@ -495,8 +473,8 @@ PhyloTree::build_neighbor(){
     modifier.set(i);
   modifier.flip(); //0...0111...1  
   
-  vector<string> bitstrings;
-  set_bitstring(bitstrings);
+  vector<string> bitlabels;
+  set_bitlabel(bitlabels);
 
   neighbor.clear();
   for(size_t i =0; i < N; ++i)
@@ -504,8 +482,8 @@ PhyloTree::build_neighbor(){
 
    for(size_t i = 0; i < N; ++i){
      std::bitset<MAX_LEAF_NUM> pattern(i); //binary representation of the i-th pattern
-     for(size_t j =0; j < bitstrings.size(); ++j){
-       std::bitset<MAX_LEAF_NUM> subtree_bit_rep(bitstrings[j]);
+     for(size_t j =0; j < bitlabels.size(); ++j){
+       std::bitset<MAX_LEAF_NUM> subtree_bit_rep(bitlabels[j]);
        size_t n1 = (pattern | subtree_bit_rep).to_ulong();
        size_t n2 = ((~pattern | subtree_bit_rep)& modifier).to_ulong();
        neighbor[i].push_back(n1);
@@ -605,29 +583,28 @@ main(int argc, const char **argv) {
     t.fill_leaf_names("Leaf", count);
     count = 0;
     t.fill_names("Internal", count);  
-   
-
  
-    
- 
-   //get common ancestor of 3 random selected leaves. 
+   //get common ancestor of 2 random selected leaves. 
     string ancestor;
     vector<string> tmp;
     vector<string> leaf_names;
     t.get_leaf_names(leaf_names); 
     srand(time(NULL));
     std::random_shuffle(leaf_names.begin(), leaf_names.end());
-    tmp.assign(leaf_names.begin(), leaf_names.begin()+3);
+    tmp.assign(leaf_names.begin(), leaf_names.begin()+2);
     cerr << "the common ancestor of "  ;
     for(size_t i =0; i < tmp.size()-1; ++i) 
       cerr << tmp[i] << ","; 
     cerr <<  tmp[tmp.size()-1] << " is " ;
-    ancestor = t.find_common_ancestor(tmp);
-    cerr << ancestor << endl; 
+    if(t.find_common_ancestor(tmp, ancestor))
+      cerr << ancestor << endl; 
+    else cerr << "unfound" << endl;
+
     // print subtree rooted at ancestor
     cout << t.tostring(ancestor) << endl;
     cout << t.Newick_format(ancestor) << endl;
 
+    //Get neighbor relations
     t.build_neighbor();
     vector<vector<size_t> > neighbor(t.get_neighbor());
     for(size_t i=0; i < neighbor.size(); ++i){
