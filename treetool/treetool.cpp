@@ -61,6 +61,7 @@
 #include <algorithm>
 #include <numeric>
 #include <sstream>
+#include <bitset>
 
 #include <cctype> // for isspace
 
@@ -74,6 +75,7 @@ using std::endl;
 using std::cerr;
 using std::cout;
 
+static const size_t MAX_LEAF_NUM = 10;
 
 static bool
 check_balanced_parentheses(const string &s) {
@@ -99,6 +101,8 @@ public:
   string tostring(const string &label) const;
   string Newick_format() const;
   string Newick_format(const string & label) const;
+  string get_bitstring() const {return bitstring;}
+  size_t get_leaf_num() const;
 
   void fill_leaf_names(const string prefix, size_t &count);
   void fill_names(const string prefix, size_t &count);
@@ -106,11 +110,13 @@ public:
   void get_leaf_names(vector<string> &leaf_names);
   bool find_common_ancestor(const vector<string> &leaf_names, 
 			    size_t &count, string &ancestor);
+  void set_bitstring(size_t &leaftracker, vector<string> &bitstrings);
 
 private:
   vector<PhyloTreeNode> child;
   string name;
   double branch_length; // distance to parent
+  string bitstring;
 };
 
 
@@ -246,6 +252,37 @@ PhyloTreeNode::find_common_ancestor(const vector<string> &leaf_names,
   return found;
 }
 
+size_t 
+PhyloTreeNode::get_leaf_num() const{
+  size_t num = 0;
+  if (is_leaf()){
+    num = 1;
+  } else{
+    for(size_t i =0; i < child.size(); ++i)
+      num += child[i].get_leaf_num();
+  }
+  return num;
+
+}
+
+
+void 
+PhyloTreeNode::set_bitstring(size_t &leaftracker, 
+			     vector<string> &bitstrings){
+  std::bitset<MAX_LEAF_NUM> bits;
+  if(is_leaf()){
+    bits.set(leaftracker);
+    leaftracker ++;
+  }else{
+    for(size_t i =0; i< child.size();++i){
+      child[i].set_bitstring(leaftracker, bitstrings);
+      std::bitset<MAX_LEAF_NUM> tmp(child[i].get_bitstring());
+      bits |= tmp;
+    }
+  }
+  bitstring = bits.to_string<char,std::string::traits_type,std::string::allocator_type>();
+  bitstrings.push_back(bitstring);
+}
 
 
 static bool
@@ -353,9 +390,15 @@ public:
   void fill_names(const string prefix, size_t &count);
   void get_leaf_names(vector<string> &leaf_names );
   string find_common_ancestor(const vector<string> &leaf_names); 
-
+  void build_neighbor();////////////////////////////////////
+  vector<vector<size_t> > get_neighbor()const{return neighbor;}
 private:
   PhyloTreeNode root;
+  size_t leaf_num;
+  vector<vector<size_t> > neighbor;
+  void set_bitstring(vector<string> &bitstrings);
+  void set_leaf_num();
+
 };
 
 string
@@ -399,6 +442,63 @@ PhyloTree::find_common_ancestor(const vector<string> &leaf_names){
     throw SMITHLABException("Ancestor not found");
   return ancestor;
 }
+
+
+void
+PhyloTree::set_leaf_num(){
+  leaf_num = root.get_leaf_num();
+  if(leaf_num > MAX_LEAF_NUM)
+    throw SMITHLABException("Number of leaves over MAX_LEAF_NUM");
+}
+
+void 
+PhyloTree::set_bitstring(vector<string> &bitstrings){
+  size_t tracker = 0;
+  root.set_bitstring(tracker, bitstrings);
+}
+
+
+
+void 
+PhyloTree::build_neighbor(){
+  set_leaf_num();
+  size_t N = pow(2, leaf_num);
+  
+  std::bitset<MAX_LEAF_NUM> modifier;
+  for(size_t i=leaf_num; i<MAX_LEAF_NUM ; ++i)
+    modifier.set(i);
+  modifier.flip(); //0...0111...1  
+  
+  vector<string> bitstrings;
+  set_bitstring(bitstrings);
+
+  neighbor.clear();
+  for(size_t i =0; i < N; ++i)
+    neighbor.push_back(vector<size_t>(1, i)); //each pattern is a neighbor of itself
+
+   for(size_t i = 0; i < N; ++i){
+     std::bitset<MAX_LEAF_NUM> pattern(i); //binary representation of the i-th pattern
+     for(size_t j =0; j < bitstrings.size(); ++j){
+       std::bitset<MAX_LEAF_NUM> subtree_bit_rep(bitstrings[j]);
+       size_t n1 = (pattern | subtree_bit_rep).to_ulong();
+       size_t n2 = ((~pattern | subtree_bit_rep)& modifier).to_ulong();
+       neighbor[i].push_back(n1);
+       neighbor[i].push_back(n2);
+       neighbor[n1].push_back(i);
+       neighbor[n2].push_back(i);
+     }
+   }
+   //remover redundancy
+   for(size_t i = 0; i < N; ++i){
+     std::sort(neighbor[i].begin(), neighbor[i].end());
+     vector<size_t>::iterator it;
+     it = std::unique(neighbor[i].begin(), neighbor[i].end());
+     neighbor[i].resize( std::distance(neighbor[i].begin(),it));
+   }
+
+}
+
+
 
 std::istream&
 operator>>(std::istream &in, PhyloTree &t) {
@@ -481,6 +581,7 @@ main(int argc, const char **argv) {
     t.fill_names("Internal", count);  
    
 
+ 
     
  
    //get common ancestor of two random selected leaves. 
@@ -500,6 +601,16 @@ main(int argc, const char **argv) {
     // print subtree rooted at ancestor
     cout << t.tostring(ancestor) << endl;
     cout << t.Newick_format(ancestor) << endl;
+
+    t.build_neighbor();
+    vector<vector<size_t> > neighbor(t.get_neighbor());
+    for(size_t i=0; i < neighbor.size(); ++i){
+      cerr << "pattern" << i << " has neighbors" ;
+      for(size_t j = 0; j < neighbor[i].size(); ++j)
+	cerr << neighbor[i][j] <<",";
+      cerr << endl;
+    }
+
 
 
     if (!label_to_check.empty())
