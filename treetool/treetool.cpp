@@ -187,43 +187,43 @@ PhyloTreeNode::Newick_format(const string &label) const {
 
 void 
 PhyloTreeNode::fill_leaf_names(const string prefix, size_t &count)  {
-  if(is_leaf()){
-    if(name.length()==0){
-      std::stringstream ss; ss << prefix << count;
-      name.assign( ss.str());
-      count ++; 
+  if (is_leaf()) {
+    if (name.empty()) {
+      name = prefix + toa(count);
+      count++; 
     }
-  }else {
-    for(size_t i = 0; i < child.size(); ++i)
-      child[i].fill_leaf_names(prefix, count);
   }
+  else
+    for (size_t i = 0; i < child.size(); ++i)
+      child[i].fill_leaf_names(prefix, count);
 }
 
 
 void 
 PhyloTreeNode::fill_names(const string prefix, size_t &count)  {
-  if(name.empty()){
-    std::stringstream ss; ss << prefix << count;
-    name.assign( ss.str());
-    count ++; 
+  if (name.empty()) {
+    name = prefix + toa(count);
+    count++; 
   } 
-  if(!is_leaf()) {
-    for(size_t i = 0; i < child.size(); ++i)
+  if (!is_leaf()) {
+    for (size_t i = 0; i < child.size(); ++i)
       child[i].fill_names(prefix, count);
   }
 }
 
+
 void 
 PhyloTreeNode::get_leaf_names(vector<string> &leaf_names){
-  if(is_leaf()){
-    assert(name.length()>0);
+  if (is_leaf()) {
+    assert(!name.empty());
     leaf_names.push_back(name);
   }
-  else{
-    for(size_t i = 0; i < child.size(); ++i)
+  else {
+    for (size_t i = 0; i < child.size(); ++i)
       child[i].get_leaf_names(leaf_names);
   }
 }
+
 
 bool 
 PhyloTreeNode::find_common_ancestor(const vector<string> &leaf_names, 
