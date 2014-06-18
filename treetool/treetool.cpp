@@ -4,7 +4,7 @@
  *    Copyright (C) 2014 University of Southern California and
  *                       Andrew D. Smith
  *
- *    Authors: Andrew D. Smith
+ *    Authors: Andrew D. Smith and Jenny Qu
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -185,6 +185,10 @@ PhyloTreeNode::Newick_format(const string &label) const {
   return nf;
 }
 
+/*Name unnamed leaf nodes in the descendants
+ *in the format of [prefix][index], keeping track
+ *of next available index with variable count
+ */
 void 
 PhyloTreeNode::fill_leaf_names(const string prefix, size_t &count)  {
   if (is_leaf()) {
@@ -198,7 +202,9 @@ PhyloTreeNode::fill_leaf_names(const string prefix, size_t &count)  {
       child[i].fill_leaf_names(prefix, count);
 }
 
-
+/*Name all unnamed nodes in the descendants
+ *in the format of [prefix][index], keeping track
+ *of next available index with variable count */
 void 
 PhyloTreeNode::fill_names(const string prefix, size_t &count)  {
   if (name.empty()) {
@@ -212,6 +218,7 @@ PhyloTreeNode::fill_names(const string prefix, size_t &count)  {
 }
 
 
+/*Put names of all descendant leaf nodes into vector leaf_names*/
 void 
 PhyloTreeNode::get_leaf_names(vector<string> &leaf_names){
   if (is_leaf()) {
@@ -225,6 +232,11 @@ PhyloTreeNode::get_leaf_names(vector<string> &leaf_names){
 }
 
 
+/*After execution:
+ *Count = number of hits by the descendant leaves given a target set of leaves;
+ *Ancestor = empty string OR the nearest common ancestor of target leaves;
+ *Return true if the ancestor has been found in the subtree rooted here
+ */
 bool 
 PhyloTreeNode::find_common_ancestor(const vector<string> &leaf_names, 
 				    size_t &count, string &ancestor){
@@ -252,6 +264,8 @@ PhyloTreeNode::find_common_ancestor(const vector<string> &leaf_names,
   return found;
 }
 
+
+/*Return total number of leaf nodes in the descendants */
 size_t 
 PhyloTreeNode::get_leaf_num() const{
   size_t num = 0;
@@ -265,7 +279,13 @@ PhyloTreeNode::get_leaf_num() const{
 
 }
 
-
+/*Make bitstring labels:
+ *Each leaf node is represented by a bitstring with exactly
+ *one bit set to 1, depending on the visit order in a DF traverse;
+ *A parent's bitstring is the OR operation result of all the children;
+ *The first argument keeps track of total number of labeled leaves.  
+ *The second argument is a collection of all bitstring labels assigned so far.
+ */
 void 
 PhyloTreeNode::set_bitstring(size_t &leaftracker, 
 			     vector<string> &bitstrings){
@@ -390,7 +410,7 @@ public:
   void fill_names(const string prefix, size_t &count);
   void get_leaf_names(vector<string> &leaf_names );
   string find_common_ancestor(const vector<string> &leaf_names); 
-  void build_neighbor();////////////////////////////////////
+  void build_neighbor();
   vector<vector<size_t> > get_neighbor()const{return neighbor;}
 private:
   PhyloTreeNode root;
@@ -427,6 +447,10 @@ PhyloTree::get_leaf_names(vector<string> & leaf_names){
   root.get_leaf_names(leaf_names);
 }
 
+/*Find the nearest common ancestor for a set of leaves in the tree
+ *Return the name of their nearest common ancestor, if found;
+ *Throw error if not found.
+ */
 string
 PhyloTree::find_common_ancestor(const vector<string> &leaf_names){
   vector<string> copy_names = leaf_names;
@@ -444,6 +468,7 @@ PhyloTree::find_common_ancestor(const vector<string> &leaf_names){
 }
 
 
+/*Assign value to the private member leaf_num*/
 void
 PhyloTree::set_leaf_num(){
   leaf_num = root.get_leaf_num();
@@ -451,6 +476,7 @@ PhyloTree::set_leaf_num(){
     throw SMITHLABException("Number of leaves over MAX_LEAF_NUM");
 }
 
+/*Assign bitstring labels to nodes in the tree*/
 void 
 PhyloTree::set_bitstring(vector<string> &bitstrings){
   size_t tracker = 0;
@@ -458,7 +484,7 @@ PhyloTree::set_bitstring(vector<string> &bitstrings){
 }
 
 
-
+/*Assign Neighbor relations basing on bitstring labels*/
 void 
 PhyloTree::build_neighbor(){
   set_leaf_num();
@@ -584,7 +610,7 @@ main(int argc, const char **argv) {
  
     
  
-   //get common ancestor of two random selected leaves. 
+   //get common ancestor of 3 random selected leaves. 
     string ancestor;
     vector<string> tmp;
     vector<string> leaf_names;
