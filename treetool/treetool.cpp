@@ -62,6 +62,7 @@
 #include <numeric>
 #include <sstream>
 #include <bitset>
+#include <unordered_set>
 
 #include <cctype> // for isspace
 
@@ -87,6 +88,27 @@ check_balanced_parentheses(const string &s) {
   return count == 0;
 }
 
+static bool
+check_unique_names(const string &s) {
+  bool is_unique=true;
+  string s_copy =s;
+  std::unordered_set<std::string> names;
+  size_t f1, f2;
+  while(!s_copy.empty()){
+    f1 = s_copy.find_first_not_of("()0123456789:,;");
+    s_copy.erase(0,f1);
+    if(s_copy.empty()) break;
+    f2 =s_copy.find_first_of("()0123456789:,;");
+    string name=s_copy.substr(0,f2);
+    if (names.find(name)== names.end()){
+      names.insert(name);
+    }else{
+      is_unique=false; 
+      break;
+    }
+  }
+  return is_unique;
+}
 
 class PhyloTreeNode {
 public:
@@ -373,13 +395,18 @@ class PhyloTree {
 public:
   PhyloTree() {}
   PhyloTree(string tree_rep) {
-    check_balanced_parentheses(tree_rep);
+    if(!check_balanced_parentheses(tree_rep))
+      throw SMITHLABException("Unbalanced parentheses in the string representation.");
     // remove whitespace
     string::iterator w = 
       std::remove_copy_if(tree_rep.begin(), tree_rep.end(),
 			  tree_rep.begin(), &isspace);
     assert(w != tree_rep.begin());
     tree_rep.erase(--w, tree_rep.end()); // The "--w" is for the ";"
+    
+    if(! check_unique_names(tree_rep))
+      throw SMITHLABException("Duplicated names in the string representation.");
+    
     root = PhyloTreeNode(tree_rep);
   }
   string tostring() const {return root.tostring();}
@@ -604,15 +631,15 @@ main(int argc, const char **argv) {
     cout << t.tostring(ancestor) << endl;
     cout << t.Newick_format(ancestor) << endl;
 
-    //Get neighbor relations
-    t.build_neighbor();
-    vector<vector<size_t> > neighbor(t.get_neighbor());
-    for(size_t i=0; i < neighbor.size(); ++i){
-      cerr << "pattern" << i << " has neighbors" ;
-      for(size_t j = 0; j < neighbor[i].size(); ++j)
-	cerr << neighbor[i][j] <<",";
-      cerr << endl;
-    }
+    // //Get neighbor relations
+    // t.build_neighbor();
+    // vector<vector<size_t> > neighbor(t.get_neighbor());
+    // for(size_t i=0; i < neighbor.size(); ++i){
+    //   cerr << "pattern" << i << " has neighbors" ;
+    //   for(size_t j = 0; j < neighbor[i].size(); ++j)
+    // 	cerr << neighbor[i][j] <<",";
+    //   cerr << endl;
+    // }
 
 
 

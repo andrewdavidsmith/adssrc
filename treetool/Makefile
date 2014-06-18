@@ -29,7 +29,7 @@ LIBS = -lgsl -lgslcblas # -lefence
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
 CXX = g++
-CXXFLAGS = -Wall -Wextra -fmessage-length=50
+CXXFLAGS = -Wall -Wextra -fmessage-length=50 -std=c++0x
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
 
@@ -42,7 +42,7 @@ ifeq "$(shell uname)" "Darwin"
 CXXFLAGS += -arch x86_64
 ifeq "$(shell if [ `sysctl -n kern.osrelease | cut -d . -f 1` -ge 13 ];\
               then echo 'true'; fi)" "true"
-CXXFLAGS += -stdlib=libstdc++
+CXXFLAGS += -stdlib=libstdc++ 
 endif
 endif
 
