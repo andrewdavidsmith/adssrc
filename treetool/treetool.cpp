@@ -62,7 +62,7 @@
 #include <numeric>
 #include <sstream>
 #include <bitset>
-#include <unordered_set>
+#include <tr1/unordered_set>
 
 #include <cctype> // for isspace
 
@@ -75,6 +75,7 @@ using std::vector;
 using std::endl;
 using std::cerr;
 using std::cout;
+using std::tr1::unordered_set;
 
 static const size_t MAX_LEAF_NUM = 10;
 
@@ -92,7 +93,7 @@ static bool
 check_unique_names(const string &s) {
   bool is_unique=true;
   string s_copy =s;
-  std::unordered_set<std::string> names;
+  unordered_set<std::string> names;
   size_t f1, f2;
   while(!s_copy.empty()){
     f1 = s_copy.find_first_not_of("()0123456789:,;");
@@ -254,8 +255,8 @@ PhyloTreeNode::get_leaf_names(vector<string> &leaf_names){
 
 
 size_t
-PhyloTreeNode::find_common_ancestor(const vector<string> &names, string &ancestor) {
- 
+PhyloTreeNode::find_common_ancestor(const vector<string> &names, 
+				    string &ancestor) {
   size_t count = 0;
   for (size_t i = 0; i < child.size() && ancestor.empty(); ++i)
     count += child[i].find_common_ancestor(names, ancestor);
@@ -292,8 +293,7 @@ PhyloTreeNode::get_leaf_num() const{
  *The second argument is a collection of all bitlabels assigned so far.
  */
 void 
-PhyloTreeNode::set_bitlabel(size_t &leaftracker, 
-			     vector<string> &bitlabels){
+PhyloTreeNode::set_bitlabel(size_t &leaftracker, vector<string> &bitlabels){
   std::bitset<MAX_LEAF_NUM> bits;
   if(is_leaf()){
     bits.set(leaftracker);
@@ -420,8 +420,8 @@ public:
   void fill_names(const string prefix, size_t &count);
   void get_leaf_names(vector<string> &leaf_names );
 
-  bool find_common_ancestor(const vector<string> &names, string &ancestor);
-
+  void find_common_ancestor(const vector<string> &names, string &ancestor);
+  
   void build_neighbor();
   vector<vector<size_t> > get_neighbor()const{return neighbor;}
 private:
@@ -462,16 +462,9 @@ PhyloTree::get_leaf_names(vector<string> & leaf_names){
 /*Find the nearest common ancestor for a set of nodes in the tree
  *Return true if found;
  */
-bool
+void
 PhyloTree::find_common_ancestor(const vector<string> &names, string &ancestor){
-  vector<string> copy_names = names;
-  vector<string>::iterator it;
-  it = std::unique(copy_names.begin(), copy_names.end());
-  if(it != copy_names.end()){
-    throw SMITHLABException("Names are not unique in query for common ancestor");
-  }
-  size_t count = root.find_common_ancestor(names, ancestor);
-  return count==names.size();
+  root.find_common_ancestor(names, ancestor);
 }
 
 /*Assign value to the private member leaf_num*/
@@ -594,7 +587,7 @@ main(int argc, const char **argv) {
     }
     const string newick_file = leftover_args.front();
     /****************** END COMMAND LINE OPTIONS *****************/
-
+    
     std::ifstream in(newick_file.c_str());
     if (!in)
       throw SMITHLABException("bad file: " + newick_file);
@@ -611,26 +604,25 @@ main(int argc, const char **argv) {
     count = 0;
     t.fill_names("Internal", count);  
  
-   //get common ancestor of 2 random selected leaves. 
+    //get common ancestor of 2 random selected leaves. 
     string ancestor;
-    vector<string> tmp;
     vector<string> leaf_names;
     t.get_leaf_names(leaf_names); 
-    srand(time(NULL));
-    std::random_shuffle(leaf_names.begin(), leaf_names.end());
-    tmp.assign(leaf_names.begin(), leaf_names.begin()+2);
-    cerr << "the common ancestor of "  ;
-    for(size_t i =0; i < tmp.size()-1; ++i) 
-      cerr << tmp[i] << ","; 
-    cerr <<  tmp[tmp.size()-1] << " is " ;
-    if(t.find_common_ancestor(tmp, ancestor))
-      cerr << ancestor << endl; 
-    else cerr << "unfound" << endl;
 
+    srand(time(0));
+    std::random_shuffle(leaf_names.begin(), leaf_names.end());
+    vector<string> tmp(leaf_names.begin(), leaf_names.begin()+2);
+
+    cerr << "the common ancestor of "  ;
+    copy(tmp.begin(), tmp.end(), std::ostream_iterator<string>(cerr, ","));
+    
+    t.find_common_ancestor(tmp, ancestor);
+    cerr << (ancestor.empty() ? "not found" : ancestor) << endl; 
+    
     // print subtree rooted at ancestor
     cout << t.tostring(ancestor) << endl;
     cout << t.Newick_format(ancestor) << endl;
-
+    
     // //Get neighbor relations
     // t.build_neighbor();
     // vector<vector<size_t> > neighbor(t.get_neighbor());
@@ -640,8 +632,6 @@ main(int argc, const char **argv) {
     // 	cerr << neighbor[i][j] <<",";
     //   cerr << endl;
     // }
-
-
 
     if (!label_to_check.empty())
       cout << label_to_check << " "
