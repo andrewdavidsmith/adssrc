@@ -61,7 +61,6 @@
 #include <algorithm>
 #include <numeric>
 #include <sstream>
-#include <bitset>
 #include <unordered_set>
 
 #include <cctype> // for isspace
@@ -88,23 +87,24 @@ check_balanced_parentheses(const string &s) {
   return count == 0;
 }
 
+//check if the names in newick string are unique
 static bool
 check_unique_names(const string &s) {
   bool is_unique=true;
   string s_copy =s;
   std::unordered_set<std::string> names;
   size_t f1, f2;
-  while(!s_copy.empty()){
-    f1 = s_copy.find_first_not_of("()0123456789:,;");
+  while(!s_copy.empty() && is_unique){
+    f1 = s_copy.find_first_not_of("()0123456789:.,;");
     s_copy.erase(0,f1);
-    if(s_copy.empty()) break;
-    f2 =s_copy.find_first_of("()0123456789:,;");
-    string name=s_copy.substr(0,f2);
-    if (names.find(name)== names.end()){
-      names.insert(name);
-    }else{
-      is_unique=false; 
-      break;
+    if(!s_copy.empty()){
+      f2 =s_copy.find_first_of("()0123456789:.,;");
+      string n = s_copy.substr(0,f2);
+      s_copy.erase(0,f2);
+      if (names.find(n)== names.end())
+	names.insert(n);
+      else
+	is_unique=false; 
     }
   }
   return is_unique;
@@ -123,20 +123,22 @@ public:
   string tostring(const string &label) const;
   string Newick_format() const;
   string Newick_format(const string & label) const;
-  string get_bitlabel() const {return bitlabel;}
   size_t get_leaf_num() const;
 
   void fill_leaf_names(const string prefix, size_t &count);
   void fill_names(const string prefix, size_t &count);
   
+  string get_name() const {return name;}
   void get_leaf_names(vector<string> &leaf_names);
+  void build_clade_leaves(vector<std::unordered_set<string> > &clade_leaves);
+
+  bool unique_names(std::unordered_set<string> &names) const;
+
   size_t find_common_ancestor(const vector<string> &names, string &ancestor);
-  void set_bitlabel(size_t &leaftracker, vector<string> &bitlabels);
 
 private:
   vector<PhyloTreeNode> child;
   string name;
-  string bitlabel;
   double branch_length; // distance to parent
 };
 
@@ -252,7 +254,9 @@ PhyloTreeNode::get_leaf_names(vector<string> &leaf_names){
   }
 }
 
-
+//Return number of hits of target ``names'' in the clade rooted here
+//If nearest common ancestor of ``names'' is found in the subtree,
+//``ancestor'' would be assigned with the ancestor's name 
 size_t
 PhyloTreeNode::find_common_ancestor(const vector<string> &names, string &ancestor) {
  
@@ -284,29 +288,39 @@ PhyloTreeNode::get_leaf_num() const{
 
 }
 
-/*Make bitlabel:
- *Label leaf nodes with bitstrings, each having exactly
- *one bit set to 1, depending on a DF traverse oreder;
- *A parent's bitlabel is the OR operation result of all the children;
- *The first argument keeps track of total number of labeled leaves.  
- *The second argument is a collection of all bitlabels assigned so far.
+/*Return true if all names in the subtree are unique, 
+ *and none of which have appeared in ``existing_names''.
+ *Add all names in the subtree to ``existing_names''.
  */
+bool 
+PhyloTreeNode::unique_names(std::unordered_set<string> &existing_names) const{
+  bool is_unique =  existing_names.count(name) ==0 ;
+  existing_names.insert(name);
+
+  if (is_unique && !is_leaf()){
+      for(size_t i =0; i < child.size(); ++i)
+	is_unique = child[i].unique_names(existing_names);
+  }
+
+  return is_unique;
+}
+
+
+/*Get all leaves in the subtree, and add the set to ``clade_leaves'' */
 void 
-PhyloTreeNode::set_bitlabel(size_t &leaftracker, 
-			     vector<string> &bitlabels){
-  std::bitset<MAX_LEAF_NUM> bits;
+PhyloTreeNode::build_clade_leaves(vector<std::unordered_set<string> > &clade_leaves){
+  std::unordered_set<string> clade;
+  std::unordered_set<string> tmp;
   if(is_leaf()){
-    bits.set(leaftracker);
-    leaftracker ++;
-  }else{
-    for(size_t i =0; i< child.size();++i){
-      child[i].set_bitlabel(leaftracker, bitlabels);
-      std::bitset<MAX_LEAF_NUM> tmp(child[i].get_bitlabel());
-      bits |= tmp;
+    clade.insert(name);
+  } else{
+    for(size_t i =0; i < child.size(); ++i){
+      child[i].build_clade_leaves(clade_leaves);
+      tmp = clade_leaves.back();
+      clade.insert(tmp.begin(), tmp.end());
     }
   }
-  bitlabel = bits.to_string<char,std::string::traits_type,std::string::allocator_type>();
-  bitlabels.push_back(bitlabel);
+  clade_leaves.push_back(clade);
 }
 
 
@@ -397,15 +411,14 @@ public:
   PhyloTree(string tree_rep) {
     if(!check_balanced_parentheses(tree_rep))
       throw SMITHLABException("Unbalanced parentheses in the string representation.");
+    if(!check_unique_names(tree_rep))
+      throw SMITHLABException("Repeated names in string representation.");
     // remove whitespace
     string::iterator w = 
       std::remove_copy_if(tree_rep.begin(), tree_rep.end(),
 			  tree_rep.begin(), &isspace);
     assert(w != tree_rep.begin());
     tree_rep.erase(--w, tree_rep.end()); // The "--w" is for the ";"
-    
-    if(! check_unique_names(tree_rep))
-      throw SMITHLABException("Duplicated names in the string representation.");
     
     root = PhyloTreeNode(tree_rep);
   }
@@ -419,18 +432,20 @@ public:
   void fill_leaf_names(const string prefix, size_t &count); 
   void fill_names(const string prefix, size_t &count);
   void get_leaf_names(vector<string> &leaf_names );
-
-  bool find_common_ancestor(const vector<string> &names, string &ancestor);
-
-  void build_neighbor();
   vector<vector<size_t> > get_neighbor()const{return neighbor;}
+
+  bool unique_names();
+  bool find_common_ancestor(const vector<string> &names, string &ancestor);
+  void build_neighbor();
 private:
   PhyloTreeNode root;
   size_t leaf_num;
+  vector<std::unordered_set<string> > clade_leaves;
+  vector<std::unordered_set<string> > states;
   vector<vector<size_t> > neighbor;
-  void set_bitlabel(vector<string> &bitlabels);
   void set_leaf_num();
-
+  void build_states();
+  void build_clade_leaves();
 };
 
 string
@@ -459,6 +474,17 @@ PhyloTree::get_leaf_names(vector<string> & leaf_names){
   root.get_leaf_names(leaf_names);
 }
 
+
+bool 
+PhyloTree::unique_names(){
+  std::unordered_set<string> names;
+  names.insert("");
+  bool is_unique = root.unique_names(names);
+  return is_unique;
+}
+
+
+
 /*Find the nearest common ancestor for a set of nodes in the tree
  *Return true if found;
  */
@@ -482,53 +508,81 @@ PhyloTree::set_leaf_num(){
     throw SMITHLABException("Number of leaves over MAX_LEAF_NUM");
 }
 
-/*Assign bitlabels to nodes*/
-void 
-PhyloTree::set_bitlabel(vector<string> &bitlabels){
-  size_t tracker = 0;
-  root.set_bitlabel(tracker, bitlabels);
+/*Get a collection of complete set of leaves for all clades in the tree*/
+void
+PhyloTree::build_clade_leaves(){
+  assert(unique_names());
+  root.build_clade_leaves(clade_leaves);
 }
 
-/*Assign Neighbor relations basing on bitlabels*/
-void 
+
+/*Binary combination of states among all leaf nodes,
+* leaf name is present in the set if its state is 'on' in the combination
+*/
+void
+PhyloTree::build_states(){
+  assert(unique_names());
+  vector<string> leaf_names;
+  get_leaf_names(leaf_names);
+  states.clear();
+  std::unordered_set<string> EmptySet;
+  std::unordered_set<string> tmp;
+  states.push_back(EmptySet);
+  for(size_t i =0; i< leaf_names.size(); ++i){
+    tmp.clear();
+    size_t N = states.size();
+    for(size_t j =0; j < N; ++j){
+      tmp = states[j];
+      tmp.insert(leaf_names[i]);
+      states.push_back(tmp);
+    }
+  }
+}
+
+/*Set neighbor relationship*/
+void
 PhyloTree::build_neighbor(){
-  set_leaf_num();
-  size_t N = pow(2, leaf_num);
-  
-  std::bitset<MAX_LEAF_NUM> modifier;
-  for(size_t i=leaf_num; i<MAX_LEAF_NUM ; ++i)
-    modifier.set(i);
-  modifier.flip(); //0...0111...1  
-  
-  vector<string> bitlabels;
-  set_bitlabel(bitlabels);
-
+  build_states();
+  build_clade_leaves();
   neighbor.clear();
-  for(size_t i =0; i < N; ++i)
-    neighbor.push_back(vector<size_t>(1, i)); //each pattern is a neighbor of itself
+  for(size_t i = 0; i < states.size(); ++i){
+    neighbor.push_back(vector<size_t>(1, i)); //neighbor with it self
+  }
+  std::unordered_set<string> tmp;
+  size_t nb;
+  for(size_t i = 0; i < states.size(); ++i){
+    for(size_t j = 0; j < clade_leaves.size(); ++j){
+      tmp =states[i];
+      
+      // First exclude these leaves
+      for(const string& x: clade_leaves[j]){
+	tmp.erase(x);
+      }
+      vector<std::unordered_set<string> >::iterator it1;
+      it1 = std::find(states.begin(), states.end(), tmp);
+      assert(it1 != states.end());	    
+      nb = std::distance(states.begin(), it1);
+      neighbor[i].push_back(nb);
+      neighbor[nb].push_back(i);
 
-   for(size_t i = 0; i < N; ++i){
-     std::bitset<MAX_LEAF_NUM> pattern(i); //binary representation of the i-th pattern
-     for(size_t j =0; j < bitlabels.size(); ++j){
-       std::bitset<MAX_LEAF_NUM> subtree_bit_rep(bitlabels[j]);
-       size_t n1 = (pattern | subtree_bit_rep).to_ulong();
-       size_t n2 = ((~pattern | subtree_bit_rep)& modifier).to_ulong();
-       neighbor[i].push_back(n1);
-       neighbor[i].push_back(n2);
-       neighbor[n1].push_back(i);
-       neighbor[n2].push_back(i);
-     }
-   }
-   //remover redundancy
-   for(size_t i = 0; i < N; ++i){
-     std::sort(neighbor[i].begin(), neighbor[i].end());
-     vector<size_t>::iterator it;
-     it = std::unique(neighbor[i].begin(), neighbor[i].end());
-     neighbor[i].resize( std::distance(neighbor[i].begin(),it));
-   }
-
+      //Then include these leaves
+      tmp.insert(clade_leaves[j].begin(), clade_leaves[j].end());
+      vector<std::unordered_set<string> >::iterator it2;
+      it2 = std::find(states.begin(), states.end(), tmp);
+      assert(it2 != states.end());
+      size_t nb = std::distance(states.begin(), it2);
+      neighbor[i].push_back(nb);
+      neighbor[nb].push_back(i);
+    }
+  }
+  //remove redundancy in neighbor
+  std::vector<size_t>::iterator it;
+  for(size_t i = 0; i < neighbor.size(); ++i){
+    std::sort(neighbor[i].begin(), neighbor[i].end());
+    it = std::unique (neighbor[i].begin(), neighbor[i].end());                                                            //                
+    neighbor[i].resize( std::distance(neighbor[i].begin(),it) );
+  }
 }
-
 
 
 std::istream&
@@ -604,45 +658,48 @@ main(int argc, const char **argv) {
     
     cout << t.tostring() << endl;
     cout << t << endl;
-
+   
     //Name unnamed nodes
     size_t count = 0;
     t.fill_leaf_names("Leaf", count);
     count = 0;
     t.fill_names("Internal", count);  
  
-   //get common ancestor of 2 random selected leaves. 
-    string ancestor;
-    vector<string> tmp;
-    vector<string> leaf_names;
-    t.get_leaf_names(leaf_names); 
-    srand(time(NULL));
-    std::random_shuffle(leaf_names.begin(), leaf_names.end());
-    tmp.assign(leaf_names.begin(), leaf_names.begin()+2);
-    cerr << "the common ancestor of "  ;
-    for(size_t i =0; i < tmp.size()-1; ++i) 
-      cerr << tmp[i] << ","; 
-    cerr <<  tmp[tmp.size()-1] << " is " ;
-    if(t.find_common_ancestor(tmp, ancestor))
-      cerr << ancestor << endl; 
-    else cerr << "unfound" << endl;
+   // //get common ancestor of 2 random selected leaves. 
+   //  string ancestor;
+   //  vector<string> tmp;
+   //  vector<string> leaf_names;
+   //  t.get_leaf_names(leaf_names); 
+   //  srand(time(NULL));
+   //  std::random_shuffle(leaf_names.begin(), leaf_names.end());
+   //  tmp.assign(leaf_names.begin(), leaf_names.begin()+2);
+   //  cerr << "the common ancestor of "  ;
+   //  for(size_t i =0; i < tmp.size()-1; ++i) 
+   //    cerr << tmp[i] << ","; 
+   //  cerr <<  tmp[tmp.size()-1] << " is " ;
+   //  if(t.find_common_ancestor(tmp, ancestor))
+   //    cerr << ancestor << endl; 
+   //  else cerr << "unfound" << endl;
 
-    // print subtree rooted at ancestor
-    cout << t.tostring(ancestor) << endl;
-    cout << t.Newick_format(ancestor) << endl;
+    // // print subtree rooted at ancestor
+    // cout << t.tostring(ancestor) << endl;
+    // cout << t.Newick_format(ancestor) << endl;
+
+    if (t.unique_names() )
+      cout << "names are unique" << endl;
+    else
+      cout << "repeated names detected" << endl;
 
     // //Get neighbor relations
-    // t.build_neighbor();
-    // vector<vector<size_t> > neighbor(t.get_neighbor());
-    // for(size_t i=0; i < neighbor.size(); ++i){
-    //   cerr << "pattern" << i << " has neighbors" ;
-    //   for(size_t j = 0; j < neighbor[i].size(); ++j)
-    // 	cerr << neighbor[i][j] <<",";
-    //   cerr << endl;
-    // }
-
-
-
+    t.build_neighbor();
+    vector<vector<size_t> > neighbor(t.get_neighbor());
+    for(size_t i=0; i < neighbor.size(); ++i){
+      cerr << "pattern" << i << " has neighbors" ;
+      for(size_t j = 0; j < neighbor[i].size(); ++j)
+     	cerr << neighbor[i][j] <<",";
+      cerr << endl;
+    }
+    
     if (!label_to_check.empty())
       cout << label_to_check << " "
 	   << (t.label_exists(label_to_check) ? 
