@@ -77,8 +77,7 @@ using std::endl;
 using std::cerr;
 using std::cout;
 
-using std::tr1::unordered_set;
-
+using std::unordered_set;
 
 int 
 main(int argc, const char **argv) {
@@ -90,14 +89,17 @@ main(int argc, const char **argv) {
     string label_to_check;
     
     /****************** COMMAND LINE OPTIONS ********************/
-    OptionParser opt_parse(strip_path(argv[0]), "manipulate Newick format "
+    OptionParser opt_parse(strip_path(argv[0]), 
+			   "manipulate Newick format "
 			   "phylogenetic trees",
 			   "<newick-input>");
-    opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
+    opt_parse.add_opt("output", 'o', 
+		      "Name of output file (default: stdout)", 
 		      false, outfile);
     opt_parse.add_opt("label", 'l', "check if this label exists", 
 		      false, label_to_check);
-    opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
+    opt_parse.add_opt("verbose", 'v', "print more run info", 
+		      false, VERBOSE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
@@ -124,18 +126,12 @@ main(int argc, const char **argv) {
     if (!in)
       throw SMITHLABException("bad file: " + newick_file);
     
-    PhyloTree t;
+    MethPhyloTree t;
     in >> t;
     
     cout << t.tostring() << endl;
     cout << t << endl;
    
-    //Name unnamed nodes
-    size_t count = 0;
-    t.fill_leaf_names("Leaf", count);
-    count = 0;
-    t.fill_names("Internal", count);  
- 
     //get common ancestor of 2 random selected leaves. 
     string ancestor;
     vector<string> leaf_names;

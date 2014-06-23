@@ -81,9 +81,7 @@ public:
 
   size_t find_common_ancestor(const std::vector<std::string> &names, 
 			      std::string &ancestor);
-  void build_clade_leaves(std::vector<std::unordered_set<std::string> > &clade_leaves);
-  //void set_bitlabel(size_t &leaftracker, std::vector<std::string> &bitlabels);
-
+  void get_clade_leaves(std::vector<std::unordered_set<std::string> > &clade_leaves);
 
 private:
   std::vector<PhyloTreeNode> child;
@@ -119,25 +117,10 @@ public:
 
   void find_common_ancestor(const std::vector<std::string> &names, 
 			    std::string &ancestor);
-  
-  void build_neighbor();
-
-  /// ADS: never "return" something like this!
-  // std::vector<std::vector<size_t> > 
-  // get_neighbor() const {return neighbor;}
-  void get_neighbor(std::vector<std::vector<size_t> > &nb);
-
+  void get_clade_leaves(std::vector<std::unordered_set<std::string> > &clade_leaves);
   
 private:
   PhyloTreeNode root;
-  size_t leaf_num;
-  std::vector<std::unordered_set<std::string> > clade_leaves;
-  std::vector<std::unordered_set<std::string> > states;
-  std::vector<std::vector<size_t> > neighbor;
-  void set_leaf_num();
-  void build_states();
-  void build_clade_leaves();
-
 };
 
 std::istream&
@@ -145,5 +128,52 @@ operator>>(std::istream &in, PhyloTree &t);
 
 std::ostream&
 operator<<(std::ostream &out, const PhyloTree &t);
+
+
+
+class MethPhyloTree{
+public:
+  MethPhyloTree(){}
+  MethPhyloTree(std::string tree_rep){
+    tree = PhyloTree(tree_rep);
+    //Name unnamed nodes
+    size_t count = 0;
+    tree.fill_leaf_names("Leaf", count);
+    count = 0;
+    tree.fill_names("Internal", count);  
+  };
+  std::string tostring() const {return tree.tostring();}
+  std::string tostring(const std::string &label) const;
+  std::string Newick_format() const {return tree.Newick_format();}
+  std::string Newick_format(const std::string &label) const;
+  bool label_exists(const std::string &label) const {
+    return tree.label_exists(label);
+  }
+  void get_leaf_names(std::vector<std::string> &leaf_names ){
+    tree.get_leaf_names(leaf_names);
+  }
+  void get_neighbor(std::vector<std::vector<size_t> > &nb) const{
+    nb = neighbor;
+  }
+
+  void build_states();
+  void build_neighbor();
+  void find_common_ancestor(const std::vector<std::string> &names, 
+			    std::string &ancestor);
+
+private:  
+  std::vector<std::unordered_set<std::string> > states;
+  std::vector<std::vector<size_t> > neighbor;
+  PhyloTree tree;
+
+};
+
+
+std::istream&
+operator>>(std::istream &in, MethPhyloTree &t);
+
+std::ostream&
+operator<<(std::ostream &out, const MethPhyloTree &t);
+
 
 #endif

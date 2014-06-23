@@ -279,14 +279,14 @@ PhyloTreeNode::unique_names(unordered_set<string> &existing_names) const{
 
 /*Get all leaves in the subtree, and add the set to ``clade_leaves'' */
 void 
-PhyloTreeNode::build_clade_leaves(vector<unordered_set<string> > &clade_leaves){
+PhyloTreeNode::get_clade_leaves(vector<unordered_set<string> > &clade_leaves){
   unordered_set<string> clade;
   unordered_set<string> tmp;
   if(is_leaf()){
     clade.insert(name);
   } else{
     for(size_t i =0; i < child.size(); ++i){
-      child[i].build_clade_leaves(clade_leaves);
+      child[i].get_clade_leaves(clade_leaves);
       tmp = clade_leaves.back();
       clade.insert(tmp.begin(), tmp.end());
     }
@@ -448,31 +448,64 @@ PhyloTree::find_common_ancestor(const vector<string> &names, string &ancestor){
   root.find_common_ancestor(names, ancestor);
 }
 
-/*Assign value to the private member leaf_num*/
+/*Get a collection of complete set of leaves 
+ *for all clades in the tree
+ */
 void
-PhyloTree::set_leaf_num(){
-  leaf_num = root.get_leaf_num();
-  if(leaf_num > MAX_LEAF_NUM)
-    throw SMITHLABException("Number of leaves over MAX_LEAF_NUM");
-}
-
-
-/*Get a collection of complete set of leaves for all clades in the tree*/
-void
-PhyloTree::build_clade_leaves(){
+PhyloTree::get_clade_leaves( std::vector<std::unordered_set<std::string> > &clade_leaves){
   assert(unique_names());
-  root.build_clade_leaves(clade_leaves);
+  root.get_clade_leaves(clade_leaves);
+}
+
+std::istream&
+operator>>(std::istream &in, PhyloTree &t) {
+  /* doing it this way to just get one tree at a time */
+  string r;
+  char c;
+  bool found_end = false;
+  while (in >> c && !found_end) {
+    r += c;
+    if (c == ';')
+      found_end = true;
+  }
+  if (!found_end)
+    throw SMITHLABException("bad tree format");
+  t = PhyloTree(r);
+  return in;
 }
 
 
-/*Binary combination of states among all leaf nodes,
-* leaf name is present in the set if its state is 'on' in the combination
+std::ostream&
+operator<<(std::ostream &out, const PhyloTree &t) {
+  return out << t.Newick_format();
+}
+
+
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+//// METH PHYLO TREE CLASS BELOW HERE                               ////
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+string 
+MethPhyloTree::tostring(const string &label) const{
+  return tree.tostring(label);
+}
+
+string 
+MethPhyloTree::Newick_format(const string &label) const{
+  return tree.Newick_format(label);
+}
+
+
+/* Binary combination of states among all leaf nodes,
+ * leaf name is present in the set if its state is 'on' 
+ * in the combination
 */
 void
-PhyloTree::build_states(){
-  assert(unique_names());
+MethPhyloTree::build_states(){
+  assert(tree.unique_names());
   vector<string> leaf_names;
-  get_leaf_names(leaf_names);
+  tree.get_leaf_names(leaf_names);
   states.clear();
   unordered_set<string> EmptySet;
   unordered_set<string> tmp;
@@ -488,12 +521,12 @@ PhyloTree::build_states(){
   }
 }
 
-
-/*Assign Neighbor relations basing on bitlabels*/
+/*Assign Neighbor relations*/
 void
-PhyloTree::build_neighbor(){
+MethPhyloTree::build_neighbor(){
   build_states();
-  build_clade_leaves();
+  std::vector<std::unordered_set<std::string> > clade_leaves;
+  tree.get_clade_leaves(clade_leaves);
   neighbor.clear();
   for(size_t i = 0; i < states.size(); ++i){
     neighbor.push_back(vector<size_t>(1, i)); //neighbor with it self
@@ -535,14 +568,13 @@ PhyloTree::build_neighbor(){
 }
 
 void 
-PhyloTree::get_neighbor(std::vector<std::vector<size_t> > &nb){
-  nb = neighbor;
+MethPhyloTree::find_common_ancestor(const std::vector<string> &names, 
+				    std::string &ancestor){
+  tree.find_common_ancestor(names, ancestor);
 }
 
-
-
 std::istream&
-operator>>(std::istream &in, PhyloTree &t) {
+operator>>(std::istream &in, MethPhyloTree &t) {
   /* doing it this way to just get one tree at a time */
   string r;
   char c;
@@ -554,12 +586,13 @@ operator>>(std::istream &in, PhyloTree &t) {
   }
   if (!found_end)
     throw SMITHLABException("bad tree format");
-  t = PhyloTree(r);
+  t = MethPhyloTree(r);
+  
   return in;
 }
 
-
 std::ostream&
-operator<<(std::ostream &out, const PhyloTree &t) {
+operator<<(std::ostream &out, const MethPhyloTree &t) {
   return out << t.Newick_format();
 }
+
