@@ -20,40 +20,6 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-/*
-
-  ABOUT NEWICK FORMAT
-  -------------------
-
-  The following should all be legal, according to wikipedia.
-
-  (,,(,));                               no nodes are named
-  (A,B,(C,D));                           leaf nodes are named
-  (A,B,(C,D)E)F;                         all nodes are named
-  (:0.1,:0.2,(:0.3,:0.4):0.5);           all but root node have a distance to parent
-  (:0.1,:0.2,(:0.3,:0.4):0.5):0.0;       all have a distance to parent
-  (A:0.1,B:0.2,(C:0.3,D:0.4):0.5);       distances and leaf names (popular)
-  (A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;     distances and all names
-  ((B:0.2,(C:0.3,D:0.4)E:0.5)F:0.1)A;    a tree rooted on a leaf node (rare)
-  
-  ========================================================================
-
-  (1) It seems like a tree always ends in a semicolon
-  (2) Trees need not be binary, but usually are ***
-  (3) Since the code needs to have uniform nodes, we will always have
-      a distance, even for the root, but this will be 0.0
-  (4) The parsing will look for commas, but not within parentheses
-  (5) No whitespace will be allowed. It will be removed initially
-  (6) There is a question of whether to allow commas or colons inside
-      names, for example by using quotes around the names or trying to
-      parse intelligently
-  (7) Leaves should have proper names as unique identifiers, if not given in the 
-      newick string, we should name them properly. 
-  (8) Search for nearest common ancestor will return the ancestor's name, for now. 
-
-*/
-
 #include <string>
 #include <vector>
 #include <iostream>
@@ -70,14 +36,15 @@
 #include "smithlab_os.hpp"
 
 #include "PhyloTree.hpp"
+#include "single_change_neighbors.hpp"
 
 using std::string;
 using std::vector;
 using std::endl;
 using std::cerr;
 using std::cout;
+using std::tr1::unordered_set;
 
-using std::unordered_set;
 
 int 
 main(int argc, const char **argv) {

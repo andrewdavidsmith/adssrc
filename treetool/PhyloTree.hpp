@@ -55,8 +55,7 @@
 
 #include <string>
 #include <vector>
-//#include <tr1/unordered_set>
-#include <unordered_set>
+#include <tr1/unordered_set>
 
 
 class PhyloTreeNode {
@@ -66,7 +65,7 @@ public:
   
   bool has_children() const {return !child.empty();}
   bool is_leaf() const {return child.empty();}
-  bool unique_names(std::unordered_set<std::string> &names) const;
+  bool unique_names(std::tr1::unordered_set<std::string> &names) const;
   bool label_exists(const std::string &label) const;
   std::string tostring(const size_t depth = 0) const;
   std::string tostring(const std::string &label) const;
@@ -78,11 +77,12 @@ public:
   void fill_names(const std::string prefix, size_t &count);
   
   void get_leaf_names(std::vector<std::string> &leaf_names);
-
+  
   size_t find_common_ancestor(const std::vector<std::string> &names, 
 			      std::string &ancestor);
-  void get_clade_leaves(std::vector<std::unordered_set<std::string> > &clade_leaves);
-
+  void 
+  get_clade_leaves(std::vector<std::tr1::unordered_set<std::string> > &clade_leaves);
+  
 private:
   std::vector<PhyloTreeNode> child;
   std::string name;
@@ -117,7 +117,8 @@ public:
 
   void find_common_ancestor(const std::vector<std::string> &names, 
 			    std::string &ancestor);
-  void get_clade_leaves(std::vector<std::unordered_set<std::string> > &clade_leaves);
+  void 
+  get_clade_leaves(std::vector<std::tr1::unordered_set<std::string> > &clade_leaves);
   
 private:
   PhyloTreeNode root;
@@ -128,52 +129,5 @@ operator>>(std::istream &in, PhyloTree &t);
 
 std::ostream&
 operator<<(std::ostream &out, const PhyloTree &t);
-
-
-
-class MethPhyloTree{
-public:
-  MethPhyloTree(){}
-  MethPhyloTree(std::string tree_rep){
-    tree = PhyloTree(tree_rep);
-    //Name unnamed nodes
-    size_t count = 0;
-    tree.fill_leaf_names("Leaf", count);
-    count = 0;
-    tree.fill_names("Internal", count);  
-  };
-  std::string tostring() const {return tree.tostring();}
-  std::string tostring(const std::string &label) const;
-  std::string Newick_format() const {return tree.Newick_format();}
-  std::string Newick_format(const std::string &label) const;
-  bool label_exists(const std::string &label) const {
-    return tree.label_exists(label);
-  }
-  void get_leaf_names(std::vector<std::string> &leaf_names ){
-    tree.get_leaf_names(leaf_names);
-  }
-  void get_neighbor(std::vector<std::vector<size_t> > &nb) const{
-    nb = neighbor;
-  }
-
-  void build_states();
-  void build_neighbor();
-  void find_common_ancestor(const std::vector<std::string> &names, 
-			    std::string &ancestor);
-
-private:  
-  std::vector<std::unordered_set<std::string> > states;
-  std::vector<std::vector<size_t> > neighbor;
-  PhyloTree tree;
-
-};
-
-
-std::istream&
-operator>>(std::istream &in, MethPhyloTree &t);
-
-std::ostream&
-operator<<(std::ostream &out, const MethPhyloTree &t);
-
 
 #endif

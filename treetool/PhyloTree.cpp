@@ -74,10 +74,8 @@ using std::vector;
 using std::endl;
 using std::cerr;
 using std::cout;
-//using std::tr1::unordered_set;
-using std::unordered_set;
+using std::tr1::unordered_set;
 
-static const size_t MAX_LEAF_NUM = 10;
 
 static bool
 check_balanced_parentheses(const string &s) {
@@ -444,7 +442,7 @@ PhyloTree::unique_names(){
  *Return true if found;
  */
 void
-PhyloTree::find_common_ancestor(const vector<string> &names, string &ancestor){
+PhyloTree::find_common_ancestor(const vector<string> &names, string &ancestor) {
   root.find_common_ancestor(names, ancestor);
 }
 
@@ -452,7 +450,7 @@ PhyloTree::find_common_ancestor(const vector<string> &names, string &ancestor){
  *for all clades in the tree
  */
 void
-PhyloTree::get_clade_leaves( std::vector<std::unordered_set<std::string> > &clade_leaves){
+PhyloTree::get_clade_leaves(vector<unordered_set<string> > &clade_leaves) {
   assert(unique_names());
   root.get_clade_leaves(clade_leaves);
 }
@@ -479,120 +477,3 @@ std::ostream&
 operator<<(std::ostream &out, const PhyloTree &t) {
   return out << t.Newick_format();
 }
-
-
-////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-//// METH PHYLO TREE CLASS BELOW HERE                               ////
-////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-string 
-MethPhyloTree::tostring(const string &label) const{
-  return tree.tostring(label);
-}
-
-string 
-MethPhyloTree::Newick_format(const string &label) const{
-  return tree.Newick_format(label);
-}
-
-
-/* Binary combination of states among all leaf nodes,
- * leaf name is present in the set if its state is 'on' 
- * in the combination
-*/
-void
-MethPhyloTree::build_states(){
-  assert(tree.unique_names());
-  vector<string> leaf_names;
-  tree.get_leaf_names(leaf_names);
-  states.clear();
-  unordered_set<string> EmptySet;
-  unordered_set<string> tmp;
-  states.push_back(EmptySet);
-  for(size_t i =0; i< leaf_names.size(); ++i){
-    tmp.clear();
-    size_t N = states.size();
-    for(size_t j =0; j < N; ++j){
-      tmp = states[j];
-      tmp.insert(leaf_names[i]);
-      states.push_back(tmp);
-    }
-  }
-}
-
-/*Assign Neighbor relations*/
-void
-MethPhyloTree::build_neighbor(){
-  build_states();
-  std::vector<std::unordered_set<std::string> > clade_leaves;
-  tree.get_clade_leaves(clade_leaves);
-  neighbor.clear();
-  for(size_t i = 0; i < states.size(); ++i){
-    neighbor.push_back(vector<size_t>(1, i)); //neighbor with it self
-  }
-  unordered_set<string> tmp;
-  size_t nb;
-  for(size_t i = 0; i < states.size(); ++i){
-    for(size_t j = 0; j < clade_leaves.size(); ++j){
-      tmp =states[i];
-      
-      // First exclude these leaves
-      for(const string& x: clade_leaves[j]){
-	tmp.erase(x);
-      }
-      vector<unordered_set<string> >::iterator it1;
-      it1 = std::find(states.begin(), states.end(), tmp);
-      assert(it1 != states.end());	    
-      nb = std::distance(states.begin(), it1);
-      neighbor[i].push_back(nb);
-      neighbor[nb].push_back(i);
-
-      //Then include these leaves
-      tmp.insert(clade_leaves[j].begin(), clade_leaves[j].end());
-      vector<unordered_set<string> >::iterator it2;
-      it2 = std::find(states.begin(), states.end(), tmp);
-      assert(it2 != states.end());
-      size_t nb = std::distance(states.begin(), it2);
-      neighbor[i].push_back(nb);
-      neighbor[nb].push_back(i);
-    }
-  }
-  //remove redundancy in neighbor
-  std::vector<size_t>::iterator it;
-  for(size_t i = 0; i < neighbor.size(); ++i){
-    std::sort(neighbor[i].begin(), neighbor[i].end());
-    it = std::unique (neighbor[i].begin(), neighbor[i].end());                                                            //                
-    neighbor[i].resize( std::distance(neighbor[i].begin(),it) );
-  }
-}
-
-void 
-MethPhyloTree::find_common_ancestor(const std::vector<string> &names, 
-				    std::string &ancestor){
-  tree.find_common_ancestor(names, ancestor);
-}
-
-std::istream&
-operator>>(std::istream &in, MethPhyloTree &t) {
-  /* doing it this way to just get one tree at a time */
-  string r;
-  char c;
-  bool found_end = false;
-  while (in >> c && !found_end) {
-    r += c;
-    if (c == ';')
-      found_end = true;
-  }
-  if (!found_end)
-    throw SMITHLABException("bad tree format");
-  t = MethPhyloTree(r);
-  
-  return in;
-}
-
-std::ostream&
-operator<<(std::ostream &out, const MethPhyloTree &t) {
-  return out << t.Newick_format();
-}
-
