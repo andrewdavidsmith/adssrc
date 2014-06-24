@@ -37,6 +37,7 @@
 
 #include "PhyloTree.hpp"
 #include "single_change_neighbors.hpp"
+#include "EpiPhyloHMM.hpp"
 
 using std::string;
 using std::vector;
@@ -135,6 +136,20 @@ main(int argc, const char **argv) {
      	cerr << MPT.neighbor[i][j] <<",";
       cerr << endl;
     }
+
+
+    // test tree_prob
+    double acc = 0;
+    std::pair<double, double> init_distr;
+    init_distr.first = 0.8;
+    init_distr.second = 1 - init_distr.first;
+    double M2Urate = 0.2, U2Mrate = 0.2; 
+    for(size_t i=0; i < MPT.states.size(); ++i ){ 
+      double tlp = tree_prob(init_distr, MPT, U2Mrate, M2Urate, MPT.states[i]);
+      acc += tlp;
+      cerr << "State " << i << " Tree prob=" << tlp << "; Acc = " << acc << endl;
+    }
+
 
     if (!label_to_check.empty())
       cout << label_to_check << " "

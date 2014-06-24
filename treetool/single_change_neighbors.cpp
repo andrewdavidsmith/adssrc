@@ -50,8 +50,6 @@ bool operator==( const unordered_set<string> &lhs, const unordered_set<string> &
   return equal;
 }
 
-
-
 /* Binary combination of states among all leaf nodes,
  * leaf name is present in the set if its state is 'on' 
  * in the combination

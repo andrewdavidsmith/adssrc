@@ -257,6 +257,18 @@ PhyloTreeNode::get_leaf_num() const{
 
 }
 
+
+
+/*Put names of all children names into vector child_names*/
+void 
+PhyloTreeNode::get_child_names(vector<string> &child_names){
+  if (!is_leaf()) 
+    for (size_t i = 0; i < child.size(); ++i)
+      child_names.push_back(child[i].get_name());
+}
+
+
+
 /*Return true if all names in the subtree are unique, 
  *and none of which have appeared in ``existing_names''.
  *Add all names in the subtree to ``existing_names''.
@@ -426,6 +438,11 @@ PhyloTree::fill_names(const string prefix, size_t &count) {
 void
 PhyloTree::get_leaf_names(vector<string> & leaf_names){
   root.get_leaf_names(leaf_names);
+}
+
+void
+PhyloTree::get_child_names(vector<string> & child_names){
+  root.get_child_names(child_names);
 }
 
 
