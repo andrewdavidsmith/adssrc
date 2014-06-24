@@ -93,16 +93,18 @@ main(int argc, const char **argv) {
     if (!in)
       throw SMITHLABException("bad file: " + newick_file);
     
-    MethPhyloTree t;
-    in >> t;
+    string tree_rep;
+    in >> tree_rep;
+    MethPhyloTree MPT(tree_rep);
+
     
-    cout << t.tostring() << endl;
-    cout << t << endl;
+    cout << MPT.tree.tostring() << endl;
+    cout << MPT.tree << endl;
    
     //get common ancestor of 2 random selected leaves. 
     string ancestor;
     vector<string> leaf_names;
-    t.get_leaf_names(leaf_names); 
+    MPT.tree.get_leaf_names(leaf_names); 
 
     srand(time(0));
     std::random_shuffle(leaf_names.begin(), leaf_names.end());
@@ -111,27 +113,32 @@ main(int argc, const char **argv) {
     cerr << "the common ancestor of "  ;
     copy(tmp.begin(), tmp.end(), std::ostream_iterator<string>(cerr, ","));
     
-    t.find_common_ancestor(tmp, ancestor);
+    MPT.tree.find_common_ancestor(tmp, ancestor);
     cerr << (ancestor.empty() ? "not found" : ancestor) << endl; 
     
     // print subtree rooted at ancestor
-    cout << t.tostring(ancestor) << endl;
-    cout << t.Newick_format(ancestor) << endl;
+    cout << MPT.tree.tostring(ancestor) << endl;
+    cout << MPT.tree.Newick_format(ancestor) << endl;
     
     //Get neighbor relations
-    t.build_neighbor();
-    vector<vector<size_t> > neighbor;
-    t.get_neighbor(neighbor);
-    for(size_t i=0; i < neighbor.size(); ++i){
+    MPT.build_states();
+    for(size_t i = 0; i < MPT.states.size(); ++i){
+      cerr << "State " << i << ": ";
+      for(const string &x: MPT.states[i])
+	cerr << x << "\t";
+      cerr << endl;
+    }
+    MPT.build_neighbor();
+    for(size_t i=0; i < MPT.neighbor.size(); ++i){
       cerr << "pattern" << i << " has neighbors" ;
-      for(size_t j = 0; j < neighbor[i].size(); ++j)
-     	cerr << neighbor[i][j] <<",";
+      for(size_t j = 0; j < MPT.neighbor[i].size(); ++j)
+     	cerr << MPT.neighbor[i][j] <<",";
       cerr << endl;
     }
 
     if (!label_to_check.empty())
       cout << label_to_check << " "
-	   << (t.label_exists(label_to_check) ? 
+	   << (MPT.tree.label_exists(label_to_check) ? 
 	       "exists" : "does not exist") << endl;
   }
   catch (const SMITHLABException &e) {

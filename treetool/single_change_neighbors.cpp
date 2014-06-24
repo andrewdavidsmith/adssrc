@@ -41,6 +41,16 @@ using std::cout;
 using std::tr1::unordered_set;
 
 
+bool operator==( const unordered_set<string> &lhs, const unordered_set<string> &rhs ){
+  bool equal = (lhs.size()==rhs.size()) ;
+  for(unordered_set<string>::const_iterator it = lhs.begin(); equal && it != lhs.end() ; ++it){
+    const string tmpkey= *it; 
+    equal = (rhs.count(tmpkey)>0);
+  }
+  return equal;
+}
+
+
 
 /* Binary combination of states among all leaf nodes,
  * leaf name is present in the set if its state is 'on' 
@@ -69,7 +79,7 @@ MethPhyloTree::build_states() {
 /*Assign Neighbor relations*/
 void
 MethPhyloTree::build_neighbor() {
-  build_states();
+  assert(!states.empty());
   vector<unordered_set<string> > clade_leaves;
   tree.get_clade_leaves(clade_leaves);
   neighbor.clear();
@@ -78,26 +88,33 @@ MethPhyloTree::build_neighbor() {
   
   for (size_t i = 0; i < states.size(); ++i) {
     for (size_t j = 0; j < clade_leaves.size(); ++j) {
-      tmp = states[i];
-      
+      unordered_set<string> tmp  = states[i];
+      size_t nb;
       // First exclude these leaves
-      unordered_set<string> tmp;
+      
       for (const string &x: clade_leaves[j])
 	tmp.erase(x);
-      
-      vector<unordered_set<string> >::iterator it1 = 
-	std::find(states.begin(), states.end(), tmp);
-      assert(it1 != states.end());	    
-      const size_t nb = std::distance(states.begin(), it1);
+
+      vector<unordered_set<string> >::iterator it;
+      bool found = false; 
+      for( it = states.begin(); !found && it !=states.end(); ++ it){ 
+	found = (*it == tmp);
+      }
+      assert(found);
+      it --;	    
+      nb = std::distance(states.begin(), it);
       neighbor[i].push_back(nb);
       neighbor[nb].push_back(i);
-      
+          
       //Then include these leaves
       tmp.insert(clade_leaves[j].begin(), clade_leaves[j].end());
-      vector<unordered_set<string> >::iterator it2 = 
-	std::find(states.begin(), states.end(), tmp);
-      assert(it2 != states.end());
-      const size_t nb = std::distance(states.begin(), it2);
+      found = false;
+      for( it = states.begin(); !found && it != states.end(); ++ it){ 
+	found = (*it == tmp);
+      }
+      assert(found);
+      it --;
+      nb = std::distance(states.begin(), it);
       neighbor[i].push_back(nb);
       neighbor[nb].push_back(i);
     }
@@ -113,33 +130,3 @@ MethPhyloTree::build_neighbor() {
 }
 
 
-void 
-MethPhyloTree::find_common_ancestor(const std::vector<string> &names, 
-				    std::string &ancestor){
-  tree.find_common_ancestor(names, ancestor);
-}
-
-
-std::istream&
-operator>>(std::istream &in, MethPhyloTree &t) {
-  /* doing it this way to just get one tree at a time */
-  string r;
-  char c;
-  bool found_end = false;
-  while (in >> c && !found_end) {
-    r += c;
-    if (c == ';')
-      found_end = true;
-  }
-  if (!found_end)
-    throw SMITHLABException("bad tree format");
-  t = MethPhyloTree(r);
-  
-  return in;
-}
-
-
-std::ostream&
-operator<<(std::ostream &out, const MethPhyloTree &t) {
-  return out << t.Newick_format();
-}

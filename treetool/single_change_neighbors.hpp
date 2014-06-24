@@ -36,20 +36,7 @@ struct MethPhyloTree {
     count = 0;
     tree.fill_names("Internal", count);  
   };
-  std::string tostring() const {return tree.tostring();}
-  std::string tostring(const std::string &label) const;
-  std::string Newick_format() const {return tree.Newick_format();}
-  std::string Newick_format(const std::string &label) const;
-  bool label_exists(const std::string &label) const {
-    return tree.label_exists(label);
-  }
-  void get_leaf_names(std::vector<std::string> &leaf_names ){
-    tree.get_leaf_names(leaf_names);
-  }
-  void get_neighbor(std::vector<std::vector<size_t> > &nb) const{
-    nb = neighbor;
-  }
-
+  
   void build_states();
   void build_neighbor();
   void find_common_ancestor(const std::vector<std::string> &names, 
