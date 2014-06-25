@@ -36,8 +36,7 @@
 #include "smithlab_os.hpp"
 
 #include "PhyloTree.hpp"
-#include "single_change_neighbors.hpp"
-#include "EpiPhyloHMM.hpp"
+
 
 using std::string;
 using std::vector;
@@ -96,16 +95,15 @@ main(int argc, const char **argv) {
     
     string tree_rep;
     in >> tree_rep;
-    MethPhyloTree MPT(tree_rep);
-
+    PhyloTree t(tree_rep);
     
-    cout << MPT.tree.tostring() << endl;
-    cout << MPT.tree << endl;
+    cout << t.tostring() << endl;
+    cout << t << endl;
    
     //get common ancestor of 2 random selected leaves. 
     string ancestor;
     vector<string> leaf_names;
-    MPT.tree.get_leaf_names(leaf_names); 
+    t.get_leaf_names(leaf_names); 
 
     srand(time(0));
     std::random_shuffle(leaf_names.begin(), leaf_names.end());
@@ -114,46 +112,18 @@ main(int argc, const char **argv) {
     cerr << "the common ancestor of "  ;
     copy(tmp.begin(), tmp.end(), std::ostream_iterator<string>(cerr, ","));
     
-    MPT.tree.find_common_ancestor(tmp, ancestor);
+    t.find_common_ancestor(tmp, ancestor);
     cerr << (ancestor.empty() ? "not found" : ancestor) << endl; 
     
     // print subtree rooted at ancestor
-    cout << MPT.tree.tostring(ancestor) << endl;
-    cout << MPT.tree.Newick_format(ancestor) << endl;
+    cout << t.tostring(ancestor) << endl;
+    cout << t.Newick_format(ancestor) << endl;
     
-    //Get neighbor relations
-    MPT.build_states();
-    for(size_t i = 0; i < MPT.states.size(); ++i){
-      cerr << "State " << i << ": ";
-      for(const string &x: MPT.states[i])
-	cerr << x << "\t";
-      cerr << endl;
-    }
-    MPT.build_neighbor();
-    for(size_t i=0; i < MPT.neighbor.size(); ++i){
-      cerr << "pattern" << i << " has neighbors" ;
-      for(size_t j = 0; j < MPT.neighbor[i].size(); ++j)
-     	cerr << MPT.neighbor[i][j] <<",";
-      cerr << endl;
-    }
-
-
-    // test tree_prob
-    double acc = 0;
-    std::pair<double, double> init_distr;
-    init_distr.first = 0.8;
-    init_distr.second = 1 - init_distr.first;
-    double M2Urate = 0.2, U2Mrate = 0.2; 
-    for(size_t i=0; i < MPT.states.size(); ++i ){ 
-      double tlp = tree_prob(init_distr, MPT, U2Mrate, M2Urate, MPT.states[i]);
-      acc += tlp;
-      cerr << "State " << i << " Tree prob=" << tlp << "; Acc = " << acc << endl;
-    }
-
+  
 
     if (!label_to_check.empty())
       cout << label_to_check << " "
-	   << (MPT.tree.label_exists(label_to_check) ? 
+	   << (t.label_exists(label_to_check) ? 
 	       "exists" : "does not exist") << endl;
   }
   catch (const SMITHLABException &e) {
