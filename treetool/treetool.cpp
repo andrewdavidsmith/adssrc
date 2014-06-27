@@ -119,7 +119,10 @@ main(int argc, const char **argv) {
     cout << t.tostring(ancestor) << endl;
     cout << t.Newick_format(ancestor) << endl;
     
-  
+    //trim tree
+    t.trim_to_keep(tmp);
+    cout << "After trimming:" << endl 
+	 << t.Newick_format() << endl;
 
     if (!label_to_check.empty())
       cout << label_to_check << " "

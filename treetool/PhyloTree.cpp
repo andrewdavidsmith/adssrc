@@ -306,6 +306,36 @@ PhyloTreeNode::get_clade_leaves(vector<unordered_set<string> > &clade_leaves){
 
 
 
+bool 
+PhyloTreeNode::trim_to_keep(const std::vector<std::string>& leaves){
+  bool keep;
+  if(is_leaf() ){
+    if(std::find(leaves.begin(), leaves.end(), name)!=leaves.end())
+      keep = true;
+  } else{
+    size_t j = 0; 
+    for(size_t i =0; i < child.size(); ++i){
+      if(child[i].trim_to_keep(leaves) ){
+	child[j] = child[i];
+	++j;
+      }
+    }
+    child.resize(j);
+    keep = (j>0); 
+    if (j ==1) { //only one leaf stays
+      set_branch_length(branch_length + child[0].get_branch_length());
+      set_name(child[0].get_name());
+      std::vector<PhyloTreeNode> newchild;
+      child[0].get_child(newchild);
+      set_child(newchild);
+    }
+  }
+  return keep;
+}
+
+
+
+
 static bool
 represents_leaf(const string &tree_rep) {
   return (tree_rep.find_first_of(',') == string::npos);
@@ -470,6 +500,13 @@ void
 PhyloTree::get_clade_leaves(vector<unordered_set<string> > &clade_leaves) {
   assert(unique_names());
   root.get_clade_leaves(clade_leaves);
+}
+
+void 
+PhyloTree::trim_to_keep(const std::vector<std::string>& leaves){
+  for(size_t i =0; i < leaves.size(); ++i)
+    assert(label_exists(leaves[i]));
+  root.trim_to_keep(leaves);
 }
 
 std::istream&
