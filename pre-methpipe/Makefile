@@ -27,7 +27,7 @@ INCLUDEDIRS = $(SMITHLAB_CPP)
 LIBS = -lgsl -lgslcblas # -lefence
 
 ifdef METHPIPE_ROOT
-PROGS += allelicmeth2 methcounts2 bsrate2 roimethstat2
+PROGS += allelicmeth2 methcounts2 bsrate2 roimethstat2 hairpinreads
 INCLUDEDIRS += $(METHPIPE_ROOT)/src/common
 endif
 
