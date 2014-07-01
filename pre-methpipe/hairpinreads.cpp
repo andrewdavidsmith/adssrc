@@ -31,17 +31,16 @@
 #include "smithlab_utils.hpp"
 #include "smithlab_os.hpp"
 
-// #include "bsutils.hpp"
-
 using std::string;
 using std::vector;
 using std::cout;
 using std::cerr;
 using std::endl;
 using std::max;
+using std::min;
 using std::accumulate;
 using std::tr1::unordered_map;
-
+using std::ptr_fun;
 
 
 struct FASTQRecord {
@@ -50,24 +49,27 @@ struct FASTQRecord {
   string score;
 
   string tostring() const {
+    string tmp;
     std::ostringstream s;
-    s << '@' << name << '\n' << seq << "\n#\n" << score;
+    s << '@' << name << '\n' << seq << '\n' << tmp << '\n' << score;  
     return s.str();
   }
-  
+    
   void revcomp();
   
   static bool 
   mates(const size_t to_ignore_at_end, // in case names have #0/1 name ends
 	const FASTQRecord &a, const FASTQRecord &b) {
+    const string namefield1 = a.name.substr(0, a.name.find_first_of(' '));
+    const string namefield2 = b.name.substr(0, b.name.find_first_of(' '));
+
     const bool same_name = 
-      equal(a.name.begin(), a.name.begin() + a.name.length() - to_ignore_at_end,
-	    b.name.begin());
+      equal(namefield1.begin(), namefield1.begin() + namefield1.length() - to_ignore_at_end,
+	    namefield2.begin());
     return same_name && a.seq.length() == b.seq.length();
   }
   
 };
-
 
 
 void
@@ -116,27 +118,46 @@ operator>>(std::istream& s, FASTQRecord &r) {
       throw SMITHLABException("FASTQ file truncated expecting score");
   }
   else s.setstate(std::ios::badbit);
-  
+
   return s;
 }
 
+////////////////////////////////////////////////////////////////////////////////
 
+static bool
+similar_letters_bisulfite(const char a, const char b) {
+  return (a == b) || (a == 'T' && b == 'C') || (a == 'G' && b == 'A');
+}
+
+
+size_t
+hairpin_similarity(FASTQRecord &r1, FASTQRecord &r2) {
+  size_t sim = 0;
+  string::const_iterator it1(r1.seq.begin());
+  string::const_iterator it2(r2.seq.begin());
+  while (it1 < r1.seq.end() && it2 < r2.seq.end())
+    sim += similar_letters_bisulfite(*it1++, *it2++);
+  return sim;
+}
 
 
 int 
 main(int argc, const char **argv) {
-  
+
   try {
-    
+
     bool VERBOSE = false;
     size_t to_ignore_at_end_of_name = 0;
     string outfile;
+    double cutoff = 0;
     
     /****************** COMMAND LINE OPTIONS ********************/
     OptionParser opt_parse(strip_path(argv[0]), "count the hairpin reads "
 			   "in the input files", "<end1-fastq> <end2-fastq>");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
 		      false, outfile);
+    opt_parse.add_opt("cutoff", 'c', "The cutoff for hairpin reads",
+		      false, cutoff);
     opt_parse.add_opt("ignore", 'i', "ignore this number of letters "
 		      "at end of name", false, to_ignore_at_end_of_name);
     opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
@@ -155,33 +176,36 @@ main(int argc, const char **argv) {
       cerr << opt_parse.about_message() << endl;
       return EXIT_SUCCESS;
     }
-    const string end_one_file = leftover_args.front();
-    const string end_two_file = leftover_args.back();
+    const string reads_file_one = leftover_args.front();
+    const string reads_file_two = leftover_args.back();
     /****************** END COMMAND LINE OPTIONS *****************/
 
-    std::ifstream in1(end_one_file.c_str());
-    if (!in1)
-      throw SMITHLABException("bad file: " + end_one_file);
+    std::ifstream f_read1(reads_file_one.c_str());
+    if(!f_read1)
+      throw SMITHLABException("cannot open input file " + reads_file_one);
     
-    std::ifstream in2(end_two_file.c_str());
-    if (!in2)
-      throw SMITHLABException("bad file: " + end_two_file);
-    
+    std::ifstream f_read2(reads_file_two.c_str());
+    if(!f_read2)
+      throw SMITHLABException("cannot open input file " + reads_file_two);
+
+    std::ofstream of;
+    if (!outfile.empty()) of.open(outfile.c_str());
+    std::ostream out(outfile.empty() ? cout.rdbuf() : of.rdbuf());   
 
     FASTQRecord end_one, end_two;
-    while (in1 >> end_one && in2 >> end_two) {
+    while (f_read1 >> end_one && f_read2 >> end_two) {
       
       if (!FASTQRecord::mates(to_ignore_at_end_of_name, end_one, end_two)) 
 	throw SMITHLABException("expected mates, got:" + 
 				end_one.tostring() + "\n" +
 				end_two.tostring());
       
+      const size_t sim = hairpin_similarity(end_one, end_two);
+      const double percent_overlap = 
+	static_cast<double>(sim)/end_one.seq.length();
+      
+      out << sim << '\t' << percent_overlap << endl;
     }
-
-    std::ofstream of;
-    if (!outfile.empty()) of.open(outfile.c_str());
-    std::ostream out(outfile.empty() ? cout.rdbuf() : of.rdbuf());
-    
   }
   catch (const SMITHLABException &e) {
     cerr << e.what() << endl;
