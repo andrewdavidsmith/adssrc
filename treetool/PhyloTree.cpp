@@ -308,7 +308,7 @@ PhyloTreeNode::get_clade_leaves(vector<unordered_set<string> > &clade_leaves){
 
 bool 
 PhyloTreeNode::trim_to_keep(const std::vector<std::string>& leaves){
-  bool keep;
+  bool keep = true;
   if(is_leaf() ){
     if(std::find(leaves.begin(), leaves.end(), name)!=leaves.end())
       keep = true;
