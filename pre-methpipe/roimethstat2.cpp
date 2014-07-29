@@ -52,7 +52,7 @@ meth_unmeth_calls(const size_t n_meth, const size_t n_unmeth) {
   double lower = 0.0, upper = 0.0;
   const size_t total = n_meth + n_unmeth;
   wilson_ci_for_binomial(alpha, total,
-			 static_cast<double>(n_meth)/total, lower, upper);
+                         static_cast<double>(n_meth)/total, lower, upper);
   return std::make_pair(lower > 0.5, upper < 0.5);
 }
 
@@ -80,9 +80,9 @@ region_bounds(const vector<SimpleGenomicRegion> &sites,
 
 static void
 not_methpipe_load_cpgs(const string &cpgs_file, 
-		       vector<SimpleGenomicRegion> &cpgs,
-		       vector<pair<double, double> > &meths,
-		       vector<size_t> &reads) {
+                       vector<SimpleGenomicRegion> &cpgs,
+                       vector<pair<double, double> > &meths,
+                       vector<size_t> &reads) {
   
   vector<GenomicRegion> cpgs_in;
   ReadBEDFile(cpgs_file, cpgs_in);
@@ -105,11 +105,11 @@ not_methpipe_load_cpgs(const string &cpgs_file,
 
 static void
 process_with_cpgs_loaded(const bool METHPIPE_FORMAT,
-			 const bool PRINT_NAN,
-			 const bool PRINT_ADDITIONAL_LEVELS,
-			 const string &cpgs_file, 
-			 vector<GenomicRegion> &regions,
-			 std::ostream &out) {
+                         const bool PRINT_NAN,
+                         const bool PRINT_ADDITIONAL_LEVELS,
+                         const string &cpgs_file, 
+                         vector<GenomicRegion> &regions,
+                         std::ostream &out) {
   
   vector<SimpleGenomicRegion> cpgs;
   vector<pair<double, double> > meths;
@@ -130,17 +130,17 @@ process_with_cpgs_loaded(const bool METHPIPE_FORMAT,
     
     for (size_t j = bounds.first; j < bounds.second; ++j) {
       if (reads[j] > 0) {
-	meth += static_cast<size_t>(meths[j].first);
-	read += reads[j];
-	++cpgs_with_reads;
-	
-	const pair<bool, bool> calls = 
-	  meth_unmeth_calls(meths[j].first, meths[j].second);
-	called_total += (calls.first || calls.second);
-	called_meth += calls.first;
-	
-	mean_meth += static_cast<double>(meths[j].first)/reads[j];
-      }	
+        meth += static_cast<size_t>(meths[j].first);
+        read += reads[j];
+        ++cpgs_with_reads;
+        
+        const pair<bool, bool> calls = 
+          meth_unmeth_calls(meths[j].first, meths[j].second);
+        called_total += (calls.first || calls.second);
+        called_meth += calls.first;
+        
+        mean_meth += static_cast<double>(meths[j].first)/reads[j];
+      } 
     }
     
     const string name = regions[i].get_name() + ":" + 
@@ -151,9 +151,9 @@ process_with_cpgs_loaded(const bool METHPIPE_FORMAT,
     if (PRINT_NAN || std::isfinite(regions[i].get_score())) {
       out << regions[i];
       if (PRINT_ADDITIONAL_LEVELS) 
-	out << '\t'
-	    << static_cast<double>(called_meth)/called_total << '\t'
-	    << mean_meth/cpgs_with_reads;
+        out << '\t'
+            << static_cast<double>(called_meth)/called_total << '\t'
+            << mean_meth/cpgs_with_reads;
       out << endl;
     }
   }
@@ -235,7 +235,7 @@ find_start_line(const string &chr, const size_t idx, std::ifstream &cpg_in) {
 
 static std::ifstream &
 load_cpg(const bool METHPIPE_FORMAT, std::ifstream &cpg_in, 
-	 GenomicRegion &cpg) {
+         GenomicRegion &cpg) {
 
   if (METHPIPE_FORMAT) {
     string chrom, seq, strand;
@@ -243,7 +243,7 @@ load_cpg(const bool METHPIPE_FORMAT, std::ifstream &cpg_in,
     double meth = 0.0;
     methpipe::read_site(cpg_in, chrom, pos, strand, seq, meth, coverage);
     cpg = GenomicRegion(chrom, pos, pos + 1, seq + ":" + toa(coverage), 
-			meth, strand[0]);
+                        meth, strand[0]);
   }
   else {
     cpg_in >> cpg;
@@ -255,11 +255,11 @@ load_cpg(const bool METHPIPE_FORMAT, std::ifstream &cpg_in,
 
 static void
 get_cpg_stats(const bool METHPIPE_FORMAT,
-	      std::ifstream &cpg_in, const GenomicRegion region,
-	      size_t &meth, size_t &reads, size_t &total_cpgs, 
-	      size_t &cpgs_with_reads,
-	      size_t &called_total, size_t &called_meth, 
-	      double &mean_meth) {
+              std::ifstream &cpg_in, const GenomicRegion region,
+              size_t &meth, size_t &reads, size_t &total_cpgs, 
+              size_t &cpgs_with_reads,
+              size_t &called_total, size_t &called_meth, 
+              double &mean_meth) {
   
   string chrom(region.get_chrom());
   const size_t start_pos = region.get_start();
@@ -268,39 +268,40 @@ get_cpg_stats(const bool METHPIPE_FORMAT,
   
   GenomicRegion cpg;
   while (load_cpg(METHPIPE_FORMAT, cpg_in, cpg) && 
-	 cpg.get_end() <= end_pos) {
+         cpg.get_end() <= end_pos) {
     if (start_pos <= cpg.get_start()) {
       ++total_cpgs;
       const size_t n_reads = atoi(smithlab::split(cpg.get_name(), ":").back().c_str());
       if (n_reads > 0) {
-	const double meth_freq = cpg.get_score();
-	const size_t n_meth = roundf(meth_freq*n_reads);
-	const size_t n_unmeth = roundf((1.0 - meth_freq)*n_reads);
-	meth += n_meth;
-	reads += n_reads;
-	++cpgs_with_reads;
-	
-	const pair<bool, bool> calls = meth_unmeth_calls(n_meth, n_unmeth);
-	called_total += (calls.first || calls.second);
-	called_meth += calls.first;
-	
-	mean_meth += static_cast<double>(n_meth)/n_reads;
-      }	
+        const double meth_freq = cpg.get_score();
+        const size_t n_meth = roundf(meth_freq*n_reads);
+        const size_t n_unmeth = roundf((1.0 - meth_freq)*n_reads);
+        meth += n_meth;
+        reads += n_reads;
+        ++cpgs_with_reads;
+        
+        const pair<bool, bool> calls = meth_unmeth_calls(n_meth, n_unmeth);
+        called_total += (calls.first || calls.second);
+        called_meth += calls.first;
+        
+        mean_meth += static_cast<double>(n_meth)/n_reads;
+      } 
     }
   }
+  cpg_in.clear();
 }
 
 
 static void
 process_with_cpgs_on_disk(const bool METHPIPE_FORMAT,
-			  const bool PRINT_NAN,
-			  const bool PRINT_ADDITIONAL_LEVELS,
-			  const string &cpgs_file, 
-			  vector<GenomicRegion> &regions,
-			  std::ostream &out) {
+                          const bool PRINT_NAN,
+                          const bool PRINT_ADDITIONAL_LEVELS,
+                          const string &cpgs_file, 
+                          vector<GenomicRegion> &regions,
+                          std::ostream &out) {
   
   std::ifstream in(cpgs_file.c_str());
-  for (size_t i = 0; i < regions.size(); ++i) {
+  for (size_t i = 0; i < regions.size() && in; ++i) {
     
     size_t meth = 0, read = 0;
     size_t cpgs_with_reads = 0;
@@ -309,8 +310,8 @@ process_with_cpgs_on_disk(const bool METHPIPE_FORMAT,
     double mean_meth = 0.0;
     
     get_cpg_stats(METHPIPE_FORMAT,
-		  in, regions[i], meth, read, total_cpgs, cpgs_with_reads,
-		  called_total, called_meth, mean_meth);
+                  in, regions[i], meth, read, total_cpgs, cpgs_with_reads,
+                  called_total, called_meth, mean_meth);
 
     const string name = regions[i].get_name() + ":" + 
       toa(total_cpgs) + ":" + toa(cpgs_with_reads) + ":" + 
@@ -321,9 +322,9 @@ process_with_cpgs_on_disk(const bool METHPIPE_FORMAT,
     if (PRINT_NAN || std::isfinite(regions[i].get_score())) {
       out << regions[i];
       if (PRINT_ADDITIONAL_LEVELS) 
-	out << '\t'
-	    << static_cast<double>(called_meth)/called_total << '\t'
-	    << mean_meth/cpgs_with_reads;
+        out << '\t'
+            << static_cast<double>(called_meth)/called_total << '\t'
+            << mean_meth/cpgs_with_reads;
       out << endl;
     }
   }
@@ -354,22 +355,22 @@ main(int argc, const char **argv) {
     
     /****************** COMMAND LINE OPTIONS ********************/
     OptionParser opt_parse(strip_path(argv[0]), "Compute average CpG "
-			   "methylation in each of a set of genomic intervals", 
-			   "<intervals-bed> <cpgs-bed>");
+                           "methylation in each of a set of genomic intervals", 
+                           "<intervals-bed> <cpgs-bed>");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
-		      false, outfile);
+                      false, outfile);
     opt_parse.add_opt("print-nan", 'P', "print all records (even if NaN score)", 
-		      false, PRINT_NAN);
+                      false, PRINT_NAN);
     opt_parse.add_opt("preload", 'L', "load all CpG sites", 
-		      false, LOAD_ENTIRE_FILE);
+                      false, LOAD_ENTIRE_FILE);
     opt_parse.add_opt("more-levels", 'M', "print more meth level information", 
-		      false, PRINT_ADDITIONAL_LEVELS);
+                      false, PRINT_ADDITIONAL_LEVELS);
     opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
       cerr << opt_parse.help_message() << endl
-	   << opt_parse.about_message() << endl;
+           << opt_parse.about_message() << endl;
       return EXIT_SUCCESS;
     }
     if (opt_parse.about_requested()) {
@@ -390,7 +391,7 @@ main(int argc, const char **argv) {
     
     if (VERBOSE)
       cerr << "FORMAT = NAME : CPGS : CPGS_WITH_READS : "
-	"METH_READS : TOTAL_READS" << endl;
+        "METH_READS : TOTAL_READS" << endl;
     
     vector<GenomicRegion> regions;
     ReadBEDFile(regions_file, regions);
@@ -407,16 +408,16 @@ main(int argc, const char **argv) {
 
     if (VERBOSE)
       cerr << "CPG FILE FORMAT: " 
-	   << (METHPIPE_FORMAT ? "METHPIPE" : "BED") << endl;
+           << (METHPIPE_FORMAT ? "METHPIPE" : "BED") << endl;
     
     if (LOAD_ENTIRE_FILE)
       process_with_cpgs_loaded(METHPIPE_FORMAT, PRINT_NAN, 
-			       PRINT_ADDITIONAL_LEVELS,
-			       cpgs_file, regions, out);
+                               PRINT_ADDITIONAL_LEVELS,
+                               cpgs_file, regions, out);
     else
       process_with_cpgs_on_disk(METHPIPE_FORMAT, PRINT_NAN, 
-				PRINT_ADDITIONAL_LEVELS,
-				cpgs_file, regions, out);
+                                PRINT_ADDITIONAL_LEVELS,
+                                cpgs_file, regions, out);
   }
   catch (const SMITHLABException &e) {
     cerr << e.what() << endl;
