@@ -1,0 +1,88 @@
+\documentclass[10pt]{article}
+
+\usepackage{times,fullpage,graphicx,amsmath, subfigure}
+\usepackage{color}
+\usepackage[pdfborder={0 0 0}]{hyperref}
+
+
+\newcommand{\meth}{\texttt{methpipe}}
+
+%%%%
+%%%% NOTE: use the following appropriately so that we can change the
+%%%% individual types later.
+%%%%
+%%
+%% For program names
+\newcommand{\prog}[1]{\texttt{#1}}
+%% For file names
+\newcommand{\fn}[1]{\texttt{#1}}
+%% For literals
+\newcommand{\lit}[1]{\texttt{#1}}
+%% For program options
+\newcommand{\op}[1]{\texttt{#1}}
+%% For DNA sequence
+\newcommand{\DNA}[1]{\texttt{\uppercase{#1}}}
+
+\begin{document}
+
+\section{Methylome construction}
+
+\subsection{Pre-mapping Processing}
+\label{sec:premapping}
+
+\paragraph{Inverted duplicated reads:} 
+The data from paired-end sequencing experiment includes two types of reads - T-rich reads and A-rich reads. They are usually kept in two separate files, one labeled with ``\_1'' and the other one labeled with ``\_2'' respectively. T-rich reads are sometimes referred to as $5^{\prime}$ reads or mate 1 and A-rich reads are sometimes referred to $3^{\prime}$ reads or mate 2. If you have a fragment of double-strands DNA to be sequenced, the base pairs starting from $5^{\prime}$ of the positive strand will be sequenced and go to the $5^{\prime}$ read, and parallelly, the base pairs starting from $5^{\prime}$ of the complementary strand will be sequenced and go to the $3^{\prime}$ read, illustrated as following (a1: adaptor1, a2: adaptor2).
+And after the following mapping, the $5^{\prime}$ read and the complementary counterpart of the $3^{\prime}$ read are mapped to the reference genome along different regions (sometimes are overlapped) respectively. But, if for some reasons (we are not clear about the reasons yet), during the libraries preparation process, the $5^{\prime}$ end of the second strand sticks to the $3^{\prime}$ end of the first strand. As the results, the generated \textbf{read1} and \textbf{read2} will be identical, and \textbf{read2} in fact is a ``fake'' read, because the complementary counterpart of \textbf{read2} can't be mapped to the reference genome except for some coincidences with small chances. We call such pair of reads ``inverted duplicats''.
+
+
+\begin{center}
+\center \textbf{Normal case} \\
+\begin{tabular}{l}
+\hline
+$5^{\prime}$-{\color{red}{a1}}-\DNA{TTAATCGCAT----------TTCTCTAAAT}-{\color{green}{a2}}-$3^{\prime}$ \\	 
+$3^{\prime}$-{\color{green}{a2}}-\DNA{AATTAGCGTA----------AAGAGATTTA}-{\color{red}{a1}}-$5^{\prime}$ \\
+\hline
+\end{tabular}
+\center $\Downarrow$ Sequencing..\\
+\begin{tabular}{lcr}
+\hline
+\textbf{read1} & & \\
+\multicolumn{3}{c}{$5^{\prime}$-{\color{red}{a1}}-\DNA{TTAATCGCAT}-{\color{green}{a2}}-$3^{\prime}$
+\DNA{--------------------}}\\	
+\multicolumn{3}{c}{\DNA{--------------------}$3^{\prime}$-{\color{green}{a2}}-\DNA{AAGAGATTTA}-{\color{red}{a1}}-$5^{\prime}$ }\\
+& & \textbf{read2} \\ 
+\hline
+\end{tabular}
+\end{center}
+
+\vspace{1cm}
+
+\begin{center}
+\center \textbf{Inverted duplicates generated}\\
+\begin{tabular}{lll}
+& $5^{\prime}$-{\color{red}{a1}}-\DNA{TTAATCGCAT----------TTCTCTAAAT}-{\color{green}{a2}}-{\color{red}{a1}}-\DNA{ATTTAGAGAA----------ATGCGATTAA}-{\color{green}{a2}}-$3^{\prime}$ & \\	
+\end{tabular}
+\center $\Downarrow$ Sequencing..\\
+\begin{tabular}{lcr}
+\hline
+\textbf{read1} & & \\
+\multicolumn{3}{c}{$5^{\prime}$-{\color{red}{a1}}-\DNA{TTAATCGCAT}-{\color{green}{a2}}-$3^{\prime}$
+\DNA{--------------------------------------------------------}} \\	 
+\multicolumn{3}{c}{\DNA{--------------------------------------------------------}$3^{\prime}$-{\color{green}{a2}}-\DNA{TACGCTAATT}-{\color{red}{a1}}-$5^{\prime}$}\\
+& & \textbf{read2} \\ 
+\hline
+\end{tabular}
+\end{center}
+
+How badly inverted duplicates will affect the mapping results is depending on the mapping methods. With respect to our methods provided by \prog{rmapbs}, the fake \textbf{read2} will cause losing the information of \textbf{read1} too even \textbf{read1} is useful. In order to not waste normal reads, \prog{inverted-dups} works to detect the inverted duplicated reads and mask \textbf{read2} with ``\DNA{N}s'' so that \textbf{read2} could be mapped to anywhere in the genome and will not encumber the mapping of \textbf{read1}. The criteria is pretty simple: the mating reads with the frequency of the identical base pairs exceeding the cut-off will be suspected as inverted duplicates. You may use \op{-c} to specify the cut-off (default is 0.9) - higher cut-off will give more conservative results. And you may generate 3 types of output files: use \op{-o} to generate the report that shows the overlapping percentage in each read; use \op{-s} to generate a quality summary of the reads; use \op{-m} to generate new reads file with inverted duplicates masked ( if you want to do so, please ensure enough disk space for new reads file, which can be very large.) 
+Below is an example of using \prog{inverted-dups} to detect the inverted duplicates:
+\begin{verbatim}
+$ ./inverted-dups -c 0.95 -o Human_ESC.invd_report -s Human_ESC.invd_stat \
+-m Human_ESC_new_2.fq Human_ESC_1.fq Human_ESC_2.fq
+\end{verbatim}
+
+
+\bibliographystyle{plain}
+\bibliography{inverted-dups}
+
+\end{document}

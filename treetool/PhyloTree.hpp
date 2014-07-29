@@ -87,6 +87,8 @@ public:
   void get_child_names(std::vector<std::string> &child_names);
   void get_leaf_names(std::vector<std::string> &leaf_names);
   void get_clade_leaves(std::vector<std::tr1::unordered_set<std::string> > &clade_leaves);
+  void get_node_names(std::vector<std::string> &node_names);
+  void get_node_names(const std::string label, std::vector<std::string> &node_names);
 
   size_t find_common_ancestor(const std::vector<std::string> &names, 
 			      std::string &ancestor);
@@ -121,13 +123,18 @@ public:
     return root.label_exists(label);
   }
   bool unique_names();
+
   void fill_leaf_names(const std::string prefix, size_t &count); 
   void fill_names(const std::string prefix, size_t &count);
+
   void get_leaf_names(std::vector<std::string> &leaf_names );
-  size_t get_child_size() const{return root.get_child_size();}
   void get_child_names(std::vector<std::string> &child_names);
-  std::string get_root_name() const{ return root.get_name();}
+  void get_node_names(std::vector<std::string> &node_names);
+  void get_node_names(const std::string label, std::vector<std::string> &node_names);
   void get_clade_leaves(std::vector<std::tr1::unordered_set<std::string> > &clade_leaves);
+  std::string get_root_name() const{ return root.get_name();}
+  size_t get_child_size() const{return root.get_child_size();}
+  
 
   void find_common_ancestor(const std::vector<std::string> &names, 
 			    std::string &ancestor);

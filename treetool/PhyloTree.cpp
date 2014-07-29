@@ -304,11 +304,34 @@ PhyloTreeNode::get_clade_leaves(vector<unordered_set<string> > &clade_leaves){
   clade_leaves.push_back(clade);
 }
 
+/*Get all node names in the subtree*/
+void 
+PhyloTreeNode::get_node_names(std::vector<std::string> &node_names){
+  node_names.push_back(get_name());
+  if(!is_leaf()){
+    for(size_t i=0; i < child.size(); ++i){
+      child[i].get_node_names(node_names);
+    }
+  }
+}
+
+/*Get all node names in the subtree rooted at the node with name label*/
+void 
+PhyloTreeNode::get_node_names(const std::string label, std::vector<std::string> &node_names){
+  if(name == label)
+    get_node_names(node_names);
+  else if (label_exists(label)){
+    for(size_t i =0; i < child.size(); ++i )
+      child[i].get_node_names(label, node_names);
+  }
+}
+
+
 
 
 bool 
 PhyloTreeNode::trim_to_keep(const std::vector<std::string>& leaves){
-  bool keep;
+  bool keep = true;
   if(is_leaf() ){
     if(std::find(leaves.begin(), leaves.end(), name)!=leaves.end())
       keep = true;
@@ -474,6 +497,17 @@ void
 PhyloTree::get_child_names(vector<string> & child_names){
   root.get_child_names(child_names);
 }
+
+void 
+PhyloTree::get_node_names(std::vector<std::string> &node_names){
+  root.get_node_names(node_names);
+}
+
+void 
+PhyloTree::get_node_names(const std::string label, std::vector<std::string> &node_names){
+  root.get_node_names(label, node_names);
+}
+
 
 
 bool 
