@@ -110,8 +110,6 @@ check_unique_names(const string &s) {
 }
 
 
-
-
 bool
 PhyloTreeNode::label_exists(const string &label) const {
   if (name == label) return true;
@@ -137,14 +135,14 @@ PhyloTreeNode::tostring(const size_t depth) const {
 string
 PhyloTreeNode::tostring(const string &label)const{
   assert(label_exists(label));
-  if (label == name)
+  if (label == name){
     return tostring();
-  
+  }
   string stringrep;
-  for (size_t i = 0; i < child.size(); ++i)
+  for (size_t i = 0; i < child.size(); ++i){
     if (child[i].label_exists(label))
       stringrep = child[i].tostring(label);
-  
+  }
   return stringrep;
 }
 
@@ -327,8 +325,6 @@ PhyloTreeNode::get_node_names(const std::string label, std::vector<std::string> 
 }
 
 
-
-
 bool 
 PhyloTreeNode::trim_to_keep(const std::vector<std::string>& leaves){
   bool keep = true;
@@ -355,8 +351,6 @@ PhyloTreeNode::trim_to_keep(const std::vector<std::string>& leaves){
   }
   return keep;
 }
-
-
 
 
 static bool
@@ -439,6 +433,17 @@ PhyloTreeNode::PhyloTreeNode(const string &tree_rep) {
   }
 }
 
+PhyloTreeNode::PhyloTreeNode(const PhyloTreeNode &node1,
+			     const PhyloTreeNode &node2,
+			     const string label,
+			     const double bl){
+  name = label;
+  branch_length = bl; 
+  child.push_back(node1);
+  child.push_back(node2);
+}
+
+
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -448,28 +453,27 @@ PhyloTreeNode::PhyloTreeNode(const string &tree_rep) {
 ////////////////////////////////////////////////////////////////////////
 
 
-PhyloTree::PhyloTree(string tree_rep) {
-  if(!check_balanced_parentheses(tree_rep))
+PhyloTree::PhyloTree(string newick) {
+  if(!check_balanced_parentheses(newick))
     throw SMITHLABException("Unbalanced parentheses in the string representation.");
-  if(!check_unique_names(tree_rep))
+  if(!check_unique_names(newick))
     throw SMITHLABException("Repeated names in string representation.");
   // remove whitespace
   string::iterator w = 
-    std::remove_copy_if(tree_rep.begin(), tree_rep.end(),
-			tree_rep.begin(), &isspace);
-  assert(w != tree_rep.begin());
-  tree_rep.erase(--w, tree_rep.end()); // The "--w" is for the ";"
+    std::remove_copy_if(newick.begin(), newick.end(),
+			newick.begin(), &isspace);
+  assert(w != newick.begin());
+  newick.erase(--w, newick.end()); // The "--w" is for the ";"
   
-  if(! check_unique_names(tree_rep))
+  if(! check_unique_names(newick))
     throw SMITHLABException("Duplicated names in the string representation.");
   
-  root = PhyloTreeNode(tree_rep);
+  root = PhyloTreeNode(newick);
 }
 
-
-string
-PhyloTree::tostring(const string &label) const{
-  return root.tostring(label);
+PhyloTree::PhyloTree(PhyloTree &t1, PhyloTree &t2){
+  
+  
 }
 
 string 
@@ -489,12 +493,12 @@ PhyloTree::fill_names(const string prefix, size_t &count) {
 }
 
 void
-PhyloTree::get_leaf_names(vector<string> & leaf_names){
+PhyloTree::get_leaf_names(vector<string> &leaf_names){
   root.get_leaf_names(leaf_names);
 }
 
 void
-PhyloTree::get_child_names(vector<string> & child_names){
+PhyloTree::get_child_names(vector<string> &child_names){
   root.get_child_names(child_names);
 }
 
@@ -534,6 +538,12 @@ void
 PhyloTree::get_clade_leaves(vector<unordered_set<string> > &clade_leaves) {
   assert(unique_names());
   root.get_clade_leaves(clade_leaves);
+}
+
+void
+PhyloTree::get_subtree_at(string label, PhyloTree &subtree){
+  
+
 }
 
 void 

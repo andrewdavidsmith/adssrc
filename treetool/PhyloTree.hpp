@@ -62,6 +62,7 @@ class PhyloTreeNode {
 public:
   PhyloTreeNode() {}
   PhyloTreeNode(const std::string &subtree_string);
+  PhyloTreeNode(const PhyloTreeNode &node1, const PhyloTreeNode &node2); 
   
   bool has_children() const {return !child.empty();}
   bool is_leaf() const {return child.empty();}
@@ -78,10 +79,12 @@ public:
   void set_branch_length(const double newlength) { branch_length=newlength;}
   void set_name(const std::string newname) { name = newname;}
   void set_child(std::vector<PhyloTreeNode> &newchild){child = newchild;}
+  void set_data(bool state){data = state;}
 
   std::string get_name() const {return name;}
   double get_branch_length() const{return branch_length;}
   void get_child(std::vector<PhyloTreeNode> &newchild){newchild = child;}
+  bool get_data(){return data;}
   size_t get_leaf_num() const;
   size_t get_child_size() const {return child.size();}
   void get_child_names(std::vector<std::string> &child_names);
@@ -98,7 +101,8 @@ public:
 private:
   std::vector<PhyloTreeNode> child;
   std::string name;
-  double branch_length; // distance to parent
+  double branch_length=0.0; // distance to parent
+  bool data=true; //data associated with the node, boolean for now.
 };
 
 
@@ -107,16 +111,9 @@ class PhyloTree {
 public:
   PhyloTree() {}
   PhyloTree(std::string tree_rep);
+  PhyloTree(const PhyloTree &t1, const PhyloTree &t2);
 
   std::string tostring() const {return root.tostring();}
-
-  /// ADS: This function seems to be designed to print a subtree
-  /// rooted at a given node. The only way this makes sense is if you
-  /// can actually obtain such a subtree as an actual tree, and if
-  /// that were true, then you should just do that and use the other
-  /// tostring function.
-  std::string tostring(const std::string &label) const;
-  
   std::string Newick_format() const {return root.Newick_format() + ";";}
   std::string Newick_format(const std::string &label) const;
   bool label_exists(const std::string &label) const {
@@ -134,12 +131,12 @@ public:
   void get_clade_leaves(std::vector<std::tr1::unordered_set<std::string> > &clade_leaves);
   std::string get_root_name() const{ return root.get_name();}
   size_t get_child_size() const{return root.get_child_size();}
+  bool get_root_data() const{ return root.get_data();}
   
+  void get_subtree_at(string label, PhyloTree &subtree);
 
-  void find_common_ancestor(const std::vector<std::string> &names, 
-			    std::string &ancestor);
+  void find_common_ancestor(const std::vector<std::string> &names, std::string &ancestor);
   void trim_to_keep(const std::vector<std::string>& leaves);
- 
   
 private:
   PhyloTreeNode root;
