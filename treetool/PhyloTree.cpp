@@ -99,15 +99,18 @@ check_unique_names(const string &s) {
     pos = s_copy.find_first_not_of("()0123456789:.,;");
     s_copy.erase(0,pos);
     if(!s_copy.empty()){
-      pos =s_copy.find_first_of("()0123456789:.,;");
+      pos = s_copy.find_first_of("()0123456789:.,;");
       n = s_copy.substr(0,pos);
       s_copy.erase(0,pos);
       if (!names.insert(n).second)
-	is_unique=false; 
+	is_unique = false; 
     }
   }
   return is_unique;
 }
+
+
+
 
 
 bool
@@ -433,15 +436,15 @@ PhyloTreeNode::PhyloTreeNode(const string &tree_rep) {
   }
 }
 
-PhyloTreeNode::PhyloTreeNode(const PhyloTreeNode &node1,
-			     const PhyloTreeNode &node2,
-			     const string label,
-			     const double bl){
-  name = label;
-  branch_length = bl; 
-  child.push_back(node1);
-  child.push_back(node2);
-}
+// PhyloTreeNode::PhyloTreeNode(const PhyloTreeNode &node1,
+// 			     const PhyloTreeNode &node2,
+// 			     const string label,
+// 			     const double bl){
+//   name = label;
+//   branch_length = bl; 
+//   child.push_back(node1);
+//   child.push_back(node2);
+//}
 
 
 
@@ -471,10 +474,10 @@ PhyloTree::PhyloTree(string newick) {
   root = PhyloTreeNode(newick);
 }
 
-PhyloTree::PhyloTree(PhyloTree &t1, PhyloTree &t2){
+// PhyloTree::PhyloTree(PhyloTree &t1, PhyloTree &t2){
   
   
-}
+// }
 
 string 
 PhyloTree::Newick_format(const string &label) const{
@@ -540,15 +543,9 @@ PhyloTree::get_clade_leaves(vector<unordered_set<string> > &clade_leaves) {
   root.get_clade_leaves(clade_leaves);
 }
 
-void
-PhyloTree::get_subtree_at(string label, PhyloTree &subtree){
-  
-
-}
-
 void 
 PhyloTree::trim_to_keep(const std::vector<std::string>& leaves){
-  for(size_t i =0; i < leaves.size(); ++i)
+  for(size_t i = 0; i < leaves.size(); ++i)
     assert(label_exists(leaves[i]));
   root.trim_to_keep(leaves);
 }
@@ -556,7 +553,7 @@ PhyloTree::trim_to_keep(const std::vector<std::string>& leaves){
 std::istream&
 operator>>(std::istream &in, PhyloTree &t) {
   /* doing it this way to just get one tree at a time */
-  string r;
+  std::string r;
   char c;
   bool found_end = false;
   while (in >> c && !found_end) {
