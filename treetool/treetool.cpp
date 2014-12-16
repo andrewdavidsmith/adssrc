@@ -45,6 +45,38 @@ using std::cerr;
 using std::cout;
 using std::tr1::unordered_set;
 
+static string 
+combine_newick(const string s1, const string s2, 
+	       const string rootname,
+	       const double branch1, const double branch2, 
+	       const double branch0){
+  string s1_copy, s2_copy;
+
+  string s = s1; 
+  size_t found2 = s.find_last_of(":");
+  size_t found3 = s.find_last_of(";");  
+  if(found2 > found3){
+    s1_copy.assign(s.substr(0, found3));
+  }else{
+    s1_copy.assign(s.substr(0, found2));
+  }
+  s.assign(s2); 
+  found2 = s.find_last_of(":");
+  found3 = s.find_last_of(";");  
+  if(found2 > found3){
+    s2_copy.assign(s.substr(0, found3));
+  }else{
+    s2_copy.assign(s.substr(0, found2));
+  }
+
+  std::ostringstream oss;
+  oss << "(" <<  s1_copy << ":" << branch1 << "," << 
+    s2_copy <<  ":" << branch2  << ")" <<
+    rootname << ":" << branch0  << ";" ;
+  string newick = oss.str();
+
+  return newick; 
+}
 
 int 
 main(int argc, const char **argv) {
@@ -116,13 +148,19 @@ main(int argc, const char **argv) {
     cerr << (ancestor.empty() ? "not found" : ancestor) << endl; 
     
     // print subtree rooted at ancestor
-    cout << t.tostring(ancestor) << endl;
+    cout << t.tostring() << endl;
     cout << t.Newick_format(ancestor) << endl;
     
     //trim tree
     t.trim_to_keep(tmp);
     cout << "After trimming:" << endl 
 	 << t.Newick_format() << endl;
+
+    //combine tree
+    string s1 = t.Newick_format(tmp[0]);
+    string s2 = t.Newick_format(tmp[1]);
+    string sc = combine_newick(s1, s2, "root", 0.1, 0.2, 0.3);
+    cerr << "combining "<< s1 << " and " << s2 << endl << sc << endl;
 
     if (!label_to_check.empty())
       cout << label_to_check << " "
