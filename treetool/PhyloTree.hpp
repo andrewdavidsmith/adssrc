@@ -127,6 +127,7 @@ public:
   void get_node_names(const std::string label, std::vector<std::string> &node_names);
   void get_clade_leaves(std::vector<std::tr1::unordered_set<std::string> > &clade_leaves);
   std::string get_root_name() const{ return root.get_name();}
+  double get_root_branch() const{ return root.get_branch_length();}
   size_t get_child_size() const{return root.get_child_size();}
   
   void find_common_ancestor(const std::vector<std::string> &names, std::string &ancestor);
