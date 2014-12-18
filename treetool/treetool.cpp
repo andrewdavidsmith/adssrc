@@ -161,6 +161,8 @@ main(int argc, const char **argv) {
     string s2 = t.Newick_format(tmp[1]);
     string sc = combine_newick(s1, s2, "root", 0.1, 0.2, 0.3);
     cerr << "combining "<< s1 << " and " << s2 << endl << sc << endl;
+    PhyloTree t2(sc);
+    cerr << t2.get_root_branch() << endl;
 
     if (!label_to_check.empty())
       cout << label_to_check << " "
