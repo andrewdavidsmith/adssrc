@@ -327,6 +327,17 @@ PhyloTreeNode::get_node_names(const std::string label, std::vector<std::string> 
   }
 }
 
+void 
+PhyloTreeNode::get_branches(std::vector<double> &branches){
+    branches.push_back(get_branch_length());
+  if(!is_leaf()){
+    for(size_t i=0; i < child.size(); ++i){
+      child[i].get_branches(branches);
+    }
+  }
+}
+
+
 
 bool 
 PhyloTreeNode::trim_to_keep(const std::vector<std::string>& leaves){
@@ -511,8 +522,14 @@ PhyloTree::get_node_names(std::vector<std::string> &node_names){
 }
 
 void 
-PhyloTree::get_node_names(const std::string label, std::vector<std::string> &node_names){
+PhyloTree::get_node_names(const std::string label, 
+			  std::vector<std::string> &node_names){
   root.get_node_names(label, node_names);
+}
+
+void
+PhyloTree::get_branches(std::vector<double> &branches){
+  root.get_branches(branches);
 }
 
 
