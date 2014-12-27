@@ -164,6 +164,16 @@ main(int argc, const char **argv) {
     PhyloTree t2(sc);
     cerr << t2.get_root_branch() << endl;
 
+
+    //get branch lengths
+    vector<double> branches;
+    t.get_branches(branches);
+    cerr << "branches are:" << endl;
+    for(size_t i =0; i < branches.size(); ++i){
+      cerr << branches[i] << "\t";
+    }
+    cerr << endl;
+
     if (!label_to_check.empty())
       cout << label_to_check << " "
 	   << (t.label_exists(label_to_check) ? 
