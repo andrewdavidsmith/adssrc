@@ -60,10 +60,27 @@
 
 class PhyloTreeNode {
 public:
-  PhyloTreeNode() {}
+  PhyloTreeNode(){}
   PhyloTreeNode(const std::string &subtree_string);
-  PhyloTreeNode(const PhyloTreeNode &node1, const PhyloTreeNode &node2); 
+  PhyloTreeNode(const PhyloTreeNode &rhs){
+    std::vector<PhyloTreeNode> tmp;
+    rhs.get_child(tmp);
+    child.assign(tmp.begin(), tmp.end());
+    branch = rhs.get_branch();
+    name = rhs.get_name();
+  }
+  void swap(PhyloTreeNode &rhs) {
+    std::swap(child, rhs.child);
+    std::swap(name, rhs.name);
+    std::swap(branch, rhs.branch);
+  }
+  PhyloTreeNode &operator=(const PhyloTreeNode &rhs) {
+    PhyloTreeNode tmp(rhs);
+    swap(tmp);
+    return *this;
+  }
   
+  //utilities
   bool has_children() const {return !child.empty();}
   bool is_leaf() const {return child.empty();}
   bool unique_names(std::tr1::unordered_set<std::string> &names) const;
@@ -72,17 +89,24 @@ public:
   std::string tostring(const std::string &label) const;
   std::string Newick_format() const;
   std::string Newick_format(const std::string & label) const;
-
+  size_t find_common_ancestor(const std::vector<std::string> &names, 
+			      std::string &ancestor)const;
+  //mutator
   void fill_leaf_names(const std::string prefix, size_t &count);
   void fill_names(const std::string prefix, size_t &count);
-
-  void set_branch_length(const double newlength) { branch_length=newlength;}
+  void set_branch(const double newlength) { branch = newlength;}
   void set_name(const std::string newname) { name = newname;}
-  void set_child(std::vector<PhyloTreeNode> &newchild){child = newchild;}
+  void set_child(std::vector<PhyloTreeNode> &newchild){
+    child.assign(newchild.begin(), newchild.end());
+  }
+  bool trim_to_keep(const std::vector<std::string>& leaves); 
 
+  //accessor
   std::string get_name() const {return name;}
-  double get_branch_length() const{return branch_length;}
-  void get_child(std::vector<PhyloTreeNode> &newchild) const{newchild = child;}
+  double get_branch() const{return branch;}
+  void get_child(std::vector<PhyloTreeNode> &newchild) const{
+    newchild.assign(child.begin(), child.end());
+  }
   size_t get_leaf_num() const;
   size_t get_child_size() const {return child.size();}
   void get_child_names(std::vector<std::string> &child_names)const;
@@ -93,24 +117,25 @@ public:
 		      std::vector<std::string> &node_names)const;
   void get_branches(std::vector<double> &branches)const;
 
-  size_t find_common_ancestor(const std::vector<std::string> &names, 
-			      std::string &ancestor)const;
-  bool trim_to_keep(const std::vector<std::string>& leaves); 
-  
-
 private:
   std::vector<PhyloTreeNode> child;
   std::string name;
-  double branch_length = 0.0; // distance to parent
+  double branch; // distance to parent
 };
 
-
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+////  PHYLO TREE CLASS BELOW HERE                                   ////
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 
 class PhyloTree {
 public:
   PhyloTree() {}
   PhyloTree(std::string tree_rep);
-  PhyloTree(const PhyloTree &t1, const PhyloTree &t2);
+  PhyloTree(const PhyloTree &rhs){
+    root = PhyloTreeNode(rhs.Newick_format());
+  }
 
   std::string tostring() const {return root.tostring();}
   std::string Newick_format() const {return root.Newick_format() + ";";}
@@ -130,7 +155,7 @@ public:
 		      std::vector<std::string> &node_names)const;
   void get_clade_leaves(std::vector<std::tr1::unordered_set<std::string> > &clade_leaves)const;
   std::string get_root_name() const{ return root.get_name();}
-  double get_root_branch() const{ return root.get_branch_length();}
+  double get_root_branch() const{ return root.get_branch();}
   void get_branches(std::vector<double> &branches) const;
   size_t get_child_size() const{return root.get_child_size();}
   

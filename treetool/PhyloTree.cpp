@@ -125,7 +125,7 @@ PhyloTreeNode::label_exists(const string &label) const {
 string
 PhyloTreeNode::tostring(const size_t depth) const {
   std::ostringstream oss;
-  oss << string(depth, '\t') << branch_length << ':' << name;
+  oss << string(depth, '\t') << branch << ':' << name;
   for (size_t i = 0; i < child.size(); ++i)
     oss << endl << child[i].tostring(depth + 1);
   return oss.str();
@@ -157,7 +157,7 @@ PhyloTreeNode::Newick_format() const {
       oss << ',' << child[i].Newick_format();
     oss << ')';
   }
-  oss << name << ':' << branch_length;
+  oss << name << ':' << branch;
   return oss.str();
 }
 
@@ -327,7 +327,7 @@ PhyloTreeNode::get_node_names(const std::string label,
 
 void 
 PhyloTreeNode::get_branches(std::vector<double> &branches) const{
-    branches.push_back(get_branch_length());
+    branches.push_back(get_branch());
   if(!is_leaf()){
     for(size_t i=0; i < child.size(); ++i){
       child[i].get_branches(branches);
@@ -354,7 +354,7 @@ PhyloTreeNode::trim_to_keep(const std::vector<std::string>& leaves){
     child.resize(j);
     keep = (j>0); 
     if (j ==1) { //only one leaf stays
-      set_branch_length(branch_length + child[0].get_branch_length());
+      set_branch(branch + child[0].get_branch());
       set_name(child[0].get_name());
       std::vector<PhyloTreeNode> newchild;
       child[0].get_child(newchild);
@@ -385,7 +385,7 @@ extract_name(const string &tree_rep) {
 
 
 static double
-extract_branch_length(const string &tree_rep) {
+extract_branch(const string &tree_rep) {
   const size_t final_parenthesis = tree_rep.find_last_of(")");
   const size_t colon_pos = tree_rep.find_first_of(":", final_parenthesis + 1);
   if (colon_pos == string::npos)
@@ -433,7 +433,7 @@ PhyloTreeNode::PhyloTreeNode(const string &tree_rep) {
   // This function needs to test the various ways that a string can be
   // passed in to represent a subtree at the current node
   
-  branch_length = extract_branch_length(tree_rep);
+  branch = extract_branch(tree_rep);
   if (root_has_name(tree_rep))
     name = extract_name(tree_rep);
   
