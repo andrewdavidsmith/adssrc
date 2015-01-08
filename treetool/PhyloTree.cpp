@@ -429,7 +429,7 @@ PhyloTreeNode::get_branches(std::vector<double> &branches) const{
 
 bool 
 PhyloTreeNode::trim_to_keep(const std::vector<std::string>& leaves){
-  bool keep = true;
+  bool keep = false;
   if(is_leaf() ){
     if(std::find(leaves.begin(), leaves.end(), name)!=leaves.end())
       keep = true;
@@ -547,8 +547,6 @@ PhyloTree::get_node_parent_idx(std::vector<size_t> &pa_idx)const{
 			       std::find(node_names.begin(), 
 					 node_names.end(), ancestor));
     pa_idx.push_back(idx);
-    cerr << node_names[i] << " and " << node_names[i-1] 
-	 << " have parent" << ancestor << endl;
   }
 }
 
