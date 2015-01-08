@@ -77,7 +77,7 @@ public:
     return treerep(label) + ";";
   }
   size_t find_common_ancestor(const std::vector<std::string> &names, 
-			      std::string &ancestor)const;
+			      std::string &ancestor, bool &found)const;
   //mutator
   void fill_leaf_names(const std::string prefix, size_t &count);
   void fill_names(const std::string prefix, size_t &count);
@@ -142,6 +142,7 @@ public:
   void get_leaf_names(std::vector<std::string> &leaf_names)const;
   void get_child_names(std::vector<std::string> &child_names)const;
   void get_node_names(std::vector<std::string> &node_names)const;
+  void get_node_parent_idx(std::vector<size_t> &pa_idx)const;
   void get_node_names(const std::string label, 
 		      std::vector<std::string> &node_names)const;
   void get_clade_leaves(std::vector<std::tr1::unordered_set<std::string> > 
@@ -151,7 +152,7 @@ public:
   void get_branches(std::vector<double> &branches) const;
   size_t get_child_size() const{return root.get_child_size();}
   
-  void find_common_ancestor(const std::vector<std::string> &names, 
+  bool find_common_ancestor(const std::vector<std::string> &names, 
 			    std::string &ancestor) const;
   void trim_to_keep(const std::vector<std::string>& leaves);
   

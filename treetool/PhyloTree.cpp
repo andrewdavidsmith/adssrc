@@ -311,18 +311,23 @@ PhyloTreeNode::get_leaf_names(vector<string> &leaf_names) const{
 //Return number of hits of target ``names'' in the clade rooted here
 //If nearest common ancestor of ``names'' is found in the subtree,
 //``ancestor'' would be assigned with the ancestor's name 
-size_t
+size_t 
 PhyloTreeNode::find_common_ancestor(const vector<string> &names, 
-				    string &ancestor) const{
+				    string &ancestor, bool &found) const{
+  
   size_t count = 0;
-  for (size_t i = 0; i < child.size() && ancestor.empty(); ++i)
-    count += child[i].find_common_ancestor(names, ancestor);
+  if(child.size() >0)
+    for (size_t i = 0; i < child.size() && !found; ++i){
+       count += child[i].find_common_ancestor(names, ancestor, found);
+    }
   
-  count += find(names.begin(), names.end(), name) != names.end();
+  if (std::find(names.begin(), names.end(), name) != names.end())
+    count ++;
   
-  if (ancestor.empty() && count == names.size())
+  if (!found && count == names.size()){
+    found = true; 
     ancestor = name;
-  
+  }  
   return count;
 }
 
@@ -524,6 +529,31 @@ PhyloTree::get_node_names(std::vector<std::string> &node_names) const{
   root.get_node_names(node_names);
 }
 
+
+void 
+PhyloTree::get_node_parent_idx(std::vector<size_t> &pa_idx)const{
+  pa_idx.clear();
+  pa_idx.push_back(0); //parent of the root is itself
+  vector<string> node_names;
+  get_node_names(node_names);
+  string ancestor;
+  vector<string> newvec;
+  for(size_t i = 1; i < node_names.size(); ++i ){
+    newvec.clear();
+    newvec.push_back(node_names[i-1]);
+    newvec.push_back(node_names[i]);
+    find_common_ancestor(newvec, ancestor);
+    size_t idx = std::distance(node_names.begin(),
+			       std::find(node_names.begin(), 
+					 node_names.end(), ancestor));
+    pa_idx.push_back(idx);
+    cerr << node_names[i] << " and " << node_names[i-1] 
+	 << " have parent" << ancestor << endl;
+  }
+}
+
+
+
 void 
 PhyloTree::get_node_names(const std::string label, 
 			  std::vector<std::string> &node_names) const{
@@ -548,10 +578,14 @@ PhyloTree::unique_names() const{
 /*Find the nearest common ancestor for a set of nodes in the tree
  *Return true if found;
  */
-void
+bool
 PhyloTree::find_common_ancestor(const vector<string> &names, 
 				string &ancestor) const{
-  root.find_common_ancestor(names, ancestor);
+  if (!ancestor.empty()) 
+    ancestor.erase(ancestor.begin(),ancestor.end());
+  bool found;
+  root.find_common_ancestor(names, ancestor, found);
+  return found;
 }
 
 /*Get a collection of complete set of leaves 

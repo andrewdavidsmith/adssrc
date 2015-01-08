@@ -139,10 +139,12 @@ main(int argc, const char **argv) {
 
     srand(time(0));
     std::random_shuffle(leaf_names.begin(), leaf_names.end());
-    vector<string> tmp(leaf_names.begin(), leaf_names.begin()+2);
+    vector<string> tmp;
+    for(size_t i =0; i < 2; ++i)
+      tmp.push_back(leaf_names[i]);
 
     cerr << "the common ancestor of "  ;
-    copy(tmp.begin(), tmp.end(), std::ostream_iterator<string>(cerr, ","));
+    copy(leaf_names.begin(), leaf_names.begin()+2, std::ostream_iterator<string>(cerr, ","));
     
     t.find_common_ancestor(tmp, ancestor);
     cerr << (ancestor.empty() ? "not found" : ancestor) << endl; 
@@ -170,6 +172,9 @@ main(int argc, const char **argv) {
 
     t.set_branch(leaf_names[2], 3000);
     cerr << t.Newick_format()<< endl;
+
+    vector<size_t> pa_idx;
+    t.get_node_parent_idx(pa_idx);
 
 
     if (!label_to_check.empty())
