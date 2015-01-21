@@ -143,6 +143,7 @@ public:
   void get_child_names(std::vector<std::string> &child_names)const;
   void get_node_names(std::vector<std::string> &node_names)const;
   void get_node_parent_idx(std::vector<size_t> &pa_idx)const;
+  void get_node_child_idx(std::vector<std::vector<size_t> > &child_idx )const;
   void get_node_names(const std::string label, 
 		      std::vector<std::string> &node_names)const;
   void get_clade_leaves(std::vector<std::tr1::unordered_set<std::string> > 
@@ -165,5 +166,13 @@ operator>>(std::istream &in, PhyloTree &t);
 
 std::ostream&
 operator<<(std::ostream &out, const PhyloTree &t);
+
+
+std::string 
+combine_newick(const std::string s1, const std::string s2, 
+	       const std::string rootname,
+	       const double branch1, const double branch2, 
+	       const double branch0);
+
 
 #endif

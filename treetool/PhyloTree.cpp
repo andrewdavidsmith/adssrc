@@ -532,10 +532,10 @@ PhyloTree::get_node_names(std::vector<std::string> &node_names) const{
 
 void 
 PhyloTree::get_node_parent_idx(std::vector<size_t> &pa_idx)const{
-  pa_idx.clear();
-  pa_idx.push_back(0); //parent of the root is itself
   vector<string> node_names;
   get_node_names(node_names);
+  pa_idx.clear();
+  pa_idx.push_back(node_names.size()); //root doesn't have parent
   string ancestor;
   vector<string> newvec;
   for(size_t i = 1; i < node_names.size(); ++i ){
@@ -549,6 +549,32 @@ PhyloTree::get_node_parent_idx(std::vector<size_t> &pa_idx)const{
     pa_idx.push_back(idx);
   }
 }
+
+void 
+PhyloTree::get_node_child_idx(vector<vector<size_t> > &child_idx)const{
+  vector<string> node_names;
+  get_node_names(node_names);
+  size_t N = node_names.size();
+  for(size_t i = 0; i < N; ++i){
+    PhyloTree t(Newick_format(node_names[i]));
+    vector<string> child_names;
+    t.get_child_names(child_names);
+    vector<size_t> indices; 
+    if(child_names.size()==0){ //no children
+      child_idx.push_back(indices);
+    }else{
+      vector<string>::iterator it;
+      for(size_t j = 0; j < child_names.size(); ++j){
+	it = std::find(node_names.begin(), node_names.end(), child_names[j]);
+	size_t idx = std::distance(node_names.begin(), it);
+	indices.push_back(idx);
+      }
+      child_idx.push_back(indices);
+    }
+  }
+}
+
+
 
 
 
@@ -630,4 +656,41 @@ operator>>(std::istream &in, PhyloTree &t) {
 std::ostream&
 operator<<(std::ostream &out, const PhyloTree &t) {
   return out << t.Newick_format();
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////
+string 
+combine_newick(const string s1, const string s2, 
+	       const string rootname,
+	       const double branch1, const double branch2, 
+	       const double branch0){
+  string s1_copy, s2_copy;
+
+  string s = s1; 
+  size_t found2 = s.find_last_of(":");
+  size_t found3 = s.find_last_of(";");  
+  if(found2 > found3){
+    s1_copy.assign(s.substr(0, found3));
+  }else{
+    s1_copy.assign(s.substr(0, found2));
+  }
+  s.assign(s2); 
+  found2 = s.find_last_of(":");
+  found3 = s.find_last_of(";");  
+  if(found2 > found3){
+    s2_copy.assign(s.substr(0, found3));
+  }else{
+    s2_copy.assign(s.substr(0, found2));
+  }
+
+  std::ostringstream oss;
+  oss << "(" <<  s1_copy << ":" << branch1 << "," << 
+    s2_copy <<  ":" << branch2  << ")" <<
+    rootname << ":" << branch0  << ";" ;
+  string newick = oss.str();
+
+  return newick; 
 }
