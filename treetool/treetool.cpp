@@ -144,8 +144,12 @@ main(int argc, const char **argv) {
     t.get_node_names(node_names);
     vector<vector<size_t> > child_idx;
     t.get_node_child_idx(child_idx);
+    vector<size_t> heights;
+    t.get_all_heights(heights);
+
     for(size_t i = 0; i < node_names.size(); ++i){
-      cerr << "node " << node_names[i] << " has parent\t";
+      cerr << "node " << node_names[i] << " has height " 
+	   << heights[i] << "\tparent\t";
       if( pa_idx[i]==node_names.size())
 	cerr << "NA;\t";
       else 

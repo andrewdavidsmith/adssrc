@@ -187,12 +187,20 @@ PhyloTreeNode::PhyloTreeNode(const string &tree_rep) {
   branch = extract_branch(tree_rep);
   if (root_has_name(tree_rep))
     name = extract_name(tree_rep);
-  
-  if (!represents_leaf(tree_rep)) {
+  if( represents_leaf(tree_rep)){
+    height = 1;
+  } else {
     vector<string> subtree_reps;
     extract_subtrees(tree_rep, subtree_reps);
     for (size_t i = 0; i < subtree_reps.size(); ++i)
       child.push_back(PhyloTreeNode(subtree_reps[i]));
+
+    size_t tmp_h = 1;
+    for (size_t i =0; i < child.size(); ++i){
+      if(child[i].get_height() > tmp_h )
+	tmp_h = child[i].get_height() ;
+    }
+    height = tmp_h+1;
   }
 }
 
@@ -514,6 +522,23 @@ PhyloTree::fill_names(const string prefix, size_t &count) {
   root.fill_names(prefix, count);
 }
 
+bool 
+PhyloTree::unique_names() const{
+  unordered_set<string> names;
+  names.insert("");
+  bool is_unique = root.unique_names(names);
+  return is_unique;
+}
+
+bool 
+PhyloTree::set_branch(const std::string label, const double newlength){
+  return root.set_branch(label, newlength);
+}
+
+
+
+
+/******* all about node names *******/
 void
 PhyloTree::get_leaf_names(vector<string> &leaf_names) const{
   root.get_leaf_names(leaf_names);
@@ -529,7 +554,22 @@ PhyloTree::get_node_names(std::vector<std::string> &node_names) const{
   root.get_node_names(node_names);
 }
 
+void 
+PhyloTree::get_node_names(const std::string label, 
+			  std::vector<std::string> &node_names) const{
+  root.get_node_names(label, node_names);
+}
 
+//Get a collection of complete set of leaves 
+//for all clades in the tree
+void
+PhyloTree::get_clade_leaves(vector<unordered_set<string> > &clade_leaves) const{
+  assert(unique_names());
+  root.get_clade_leaves(clade_leaves);
+}
+
+
+/******* all about indices *******/
 void 
 PhyloTree::get_node_parent_idx(std::vector<size_t> &pa_idx)const{
   vector<string> node_names;
@@ -574,29 +614,37 @@ PhyloTree::get_node_child_idx(vector<vector<size_t> > &child_idx)const{
   }
 }
 
+/******* all about heights *******/
+size_t
+PhyloTree::get_node_height(const string label) const{
+  assert(label_exists(label));
 
-
-
-
-void 
-PhyloTree::get_node_names(const std::string label, 
-			  std::vector<std::string> &node_names) const{
-  root.get_node_names(label, node_names);
+  if(get_root_name() == label)
+    return( root.get_height());
+  else{
+    string nw = Newick_format(label);
+    PhyloTree tmptree(nw);
+    return tmptree.get_tree_height();
+  }
 }
+
+void
+PhyloTree::get_all_heights(vector<size_t> &heights) const{
+  vector<string> nodenames;
+  get_node_names(nodenames);
+  for (size_t i = 0; i < nodenames.size(); ++i){
+    heights.push_back(get_node_height(nodenames[i]));
+  }
+}
+///////////////////////////////////
+
+
 
 void
 PhyloTree::get_branches(std::vector<double> &branches) const{
   root.get_branches(branches);
 }
 
-
-bool 
-PhyloTree::unique_names() const{
-  unordered_set<string> names;
-  names.insert("");
-  bool is_unique = root.unique_names(names);
-  return is_unique;
-}
 
 
 /*Find the nearest common ancestor for a set of nodes in the tree
@@ -612,25 +660,13 @@ PhyloTree::find_common_ancestor(const vector<string> &names,
   return found;
 }
 
-/*Get a collection of complete set of leaves 
- *for all clades in the tree
- */
-void
-PhyloTree::get_clade_leaves(vector<unordered_set<string> > &clade_leaves) const{
-  assert(unique_names());
-  root.get_clade_leaves(clade_leaves);
-}
+
 
 void 
 PhyloTree::trim_to_keep(const std::vector<std::string>& leaves){
   for(size_t i = 0; i < leaves.size(); ++i)
     assert(label_exists(leaves[i]));
   root.trim_to_keep(leaves);
-}
-
-bool 
-PhyloTree::set_branch(const std::string label, const double newlength){
-  return root.set_branch(label, newlength);
 }
 
 

@@ -95,6 +95,7 @@ public:
   void get_child(std::vector<PhyloTreeNode> &newchild) const{
     newchild.assign(child.begin(), child.end());
   }
+  size_t get_height() const{return height;}
   size_t get_leaf_num() const;
   size_t get_child_size() const {return child.size();}
   void get_child_names(std::vector<std::string> &child_names)const;
@@ -110,6 +111,7 @@ private:
   std::vector<PhyloTreeNode> child;
   std::string name;
   double branch; // distance to parent
+  size_t height; //height in the tree, leaf has height 1
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -138,20 +140,24 @@ public:
   void fill_names(const std::string prefix, size_t &count);
   bool set_branch(const std::string label, const double newlength);
 
-
+  std::string get_root_name() const{ return root.get_name();}
   void get_leaf_names(std::vector<std::string> &leaf_names)const;
   void get_child_names(std::vector<std::string> &child_names)const;
   void get_node_names(std::vector<std::string> &node_names)const;
-  void get_node_parent_idx(std::vector<size_t> &pa_idx)const;
-  void get_node_child_idx(std::vector<std::vector<size_t> > &child_idx )const;
-  void get_node_names(const std::string label, 
-		      std::vector<std::string> &node_names)const;
+  void get_node_names(const std::string label, std::vector<std::string> &node_names)const;
   void get_clade_leaves(std::vector<std::tr1::unordered_set<std::string> > 
 			&clade_leaves)const;
-  std::string get_root_name() const{ return root.get_name();}
+
+  void get_node_parent_idx(std::vector<size_t> &pa_idx)const;
+  void get_node_child_idx(std::vector<std::vector<size_t> > &child_idx )const;
+
+  size_t get_tree_height() const { return root.get_height();}
+  size_t get_node_height(const std::string label) const;
+  void get_all_heights(std::vector<size_t> &heights) const;
+
   double get_root_branch() const{ return root.get_branch();}
   void get_branches(std::vector<double> &branches) const;
-  size_t get_child_size() const{return root.get_child_size();}
+  size_t get_child_size() const{ return root.get_child_size();}
   
   bool find_common_ancestor(const std::vector<std::string> &names, 
 			    std::string &ancestor) const;
