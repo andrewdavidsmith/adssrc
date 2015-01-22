@@ -535,6 +535,18 @@ PhyloTree::set_branch(const std::string label, const double newlength){
   return root.set_branch(label, newlength);
 }
 
+bool 
+PhyloTree::set_branches(const vector<double> &newlengths){
+  vector<string> nodenames;
+  get_node_names(nodenames);
+  if (newlengths.size() != nodenames.size())
+    return false;
+
+  bool suc = true;
+  for (size_t i = 0; i < newlengths.size(); ++i)
+    suc = suc & root.set_branch(nodenames[i], newlengths[i]);
+  return suc;
+}
 
 
 

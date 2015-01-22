@@ -139,7 +139,7 @@ public:
   void fill_leaf_names(const std::string prefix, size_t &count); 
   void fill_names(const std::string prefix, size_t &count);
   bool set_branch(const std::string label, const double newlength);
-
+  bool set_branches(const std::vector<double> &newlengths);
   std::string get_root_name() const{ return root.get_name();}
   void get_leaf_names(std::vector<std::string> &leaf_names)const;
   void get_child_names(std::vector<std::string> &child_names)const;
