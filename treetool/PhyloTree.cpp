@@ -626,6 +626,24 @@ PhyloTree::get_node_child_idx(vector<vector<size_t> > &child_idx)const{
   }
 }
 
+void 
+PhyloTree::get_leaf_idx(vector<size_t> &leaf_idx)const{
+  leaf_idx.clear();
+  vector<string> nodenames;
+  vector<string> leafnames;
+  get_node_names(nodenames);
+  get_leaf_names(leafnames); 
+
+  size_t nl = leafnames.size();
+  for(size_t i = 0; i < nl; ++i){
+    vector<string>::iterator it = 
+      std::find(nodenames.begin(), nodenames.end(), leafnames[i]);
+    leaf_idx.push_back(std::distance(nodenames.begin(), it));
+  }
+}
+
+
+
 /******* all about heights *******/
 size_t
 PhyloTree::get_node_height(const string label) const{

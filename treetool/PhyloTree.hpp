@@ -150,6 +150,7 @@ public:
 
   void get_node_parent_idx(std::vector<size_t> &pa_idx)const;
   void get_node_child_idx(std::vector<std::vector<size_t> > &child_idx )const;
+  void get_leaf_idx(std::vector<size_t> &leaf_idx )const;
 
   size_t get_tree_height() const { return root.get_height();}
   size_t get_node_height(const std::string label) const;
