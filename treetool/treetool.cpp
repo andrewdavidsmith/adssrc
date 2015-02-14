@@ -165,6 +165,12 @@ main(int argc, const char **argv) {
       }
     }
 
+    vector<size_t> leafidx;
+    t.get_leaf_idx(leafidx);
+    for(size_t i = 0; i < leafidx.size(); ++i){
+      cerr << "Leaf " << i << " is " << node_names[leafidx[i]] << endl;
+    }
+
 
     if (!label_to_check.empty())
       cout << label_to_check << " "

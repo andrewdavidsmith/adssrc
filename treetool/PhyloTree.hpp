@@ -147,6 +147,10 @@ public:
   void get_node_names(const std::string label, std::vector<std::string> &node_names)const;
   void get_clade_leaves(std::vector<std::tr1::unordered_set<std::string> > 
 			&clade_leaves)const;
+  size_t get_treesize() const{
+    std::vector<std::string> node_names;
+    get_node_names(node_names);
+    return node_names.size();}
 
   void get_node_parent_idx(std::vector<size_t> &pa_idx)const;
   void get_node_child_idx(std::vector<std::vector<size_t> > &child_idx )const;
