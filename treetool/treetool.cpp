@@ -46,6 +46,7 @@ using std::cout;
 using std::tr1::unordered_set;
 
 
+
 int 
 main(int argc, const char **argv) {
   
@@ -93,36 +94,83 @@ main(int argc, const char **argv) {
     if (!in)
       throw SMITHLABException("bad file: " + newick_file);
     
-    string tree_rep;
-    in >> tree_rep;
-    PhyloTree t(tree_rep);
+    string nw;
+    in >> nw;
+    PhyloTree t(nw);
+    size_t namesuf = 1;
+    t.fill_names("INT",namesuf);
     
-    cout << t.tostring() << endl;
-    cout << t << endl;
-   
-    //get common ancestor of 2 random selected leaves. 
-    string ancestor;
-    vector<string> leaf_names;
-    t.get_leaf_names(leaf_names); 
+    /***** get common ancestor of 2 random selected leaves. ****/
+    // string ancestor;
+    // vector<string> leaf_names;
+    // t.get_leaf_names(leaf_names); 
 
-    srand(time(0));
-    std::random_shuffle(leaf_names.begin(), leaf_names.end());
-    vector<string> tmp(leaf_names.begin(), leaf_names.begin()+2);
+    // srand(time(0));
+    // std::random_shuffle(leaf_names.begin(), leaf_names.end());
+    // vector<string> tmp;
+    // for(size_t i =0; i < 2; ++i)
+    //   tmp.push_back(leaf_names[i]);
 
-    cerr << "the common ancestor of "  ;
-    copy(tmp.begin(), tmp.end(), std::ostream_iterator<string>(cerr, ","));
+    //  cerr << "the common ancestor of "  ;
+    //  copy(tmp.begin(), tmp.end(), 
+    //      std::ostream_iterator<string>(cerr, ","));
     
-    t.find_common_ancestor(tmp, ancestor);
-    cerr << (ancestor.empty() ? "not found" : ancestor) << endl; 
+    // t.find_common_ancestor(tmp, ancestor);
+    // cerr << "is " <<  (ancestor.empty() ? "not found" : ancestor) << endl; 
     
-    // print subtree rooted at ancestor
-    cout << t.tostring(ancestor) << endl;
-    cout << t.Newick_format(ancestor) << endl;
+    // // print subtree rooted at ancestor
+    // cout << t.Newick_format(ancestor) << endl;
     
-    //trim tree
-    t.trim_to_keep(tmp);
-    cout << "After trimming:" << endl 
-	 << t.Newick_format() << endl;
+    /**** trim tree *******/
+    // t.trim_to_keep(tmp);
+    // cout << "After trimming:" << endl 
+    // 	 << t.Newick_format() << endl;
+
+    /**** combine tree *****/
+    // string s1 = t.Newick_format(tmp[0]);
+    // string s2 = t.Newick_format(tmp[1]);
+    // string sc = combine_newick(s1, s2, "root", 0.1, 0.2, 0.3);
+    // cerr << "combining "<< s1 << " and " << s2 << endl << sc << endl;
+    // PhyloTree t2(sc);
+    // cerr << t2.get_root_branch() << endl;
+
+    // t.set_branch(leaf_names[2], 3000);
+    // cerr << t.Newick_format()<< endl;
+
+    vector<size_t> pa_idx;
+    t.get_node_parent_idx(pa_idx);
+
+    vector<string> node_names;
+    t.get_node_names(node_names);
+    vector<vector<size_t> > child_idx;
+    t.get_node_child_idx(child_idx);
+    vector<size_t> heights;
+    t.get_all_heights(heights);
+
+    for(size_t i = 0; i < node_names.size(); ++i){
+      cerr << "node " << node_names[i] << " has height " 
+	   << heights[i] << "\tparent\t";
+      if( pa_idx[i]==node_names.size())
+	cerr << "NA;\t";
+      else 
+	cerr << node_names[pa_idx[i]] << ";\t";
+
+      cerr << " and children \t";
+      if(child_idx[i].size()==0)
+	cerr << "NA" << endl;
+      else{
+	for(size_t j = 0; j < child_idx[i].size(); ++j )
+	  cerr << node_names[child_idx[i][j]] << "\t";
+	cerr << endl;
+      }
+    }
+
+    vector<size_t> leafidx;
+    t.get_leaf_idx(leafidx);
+    for(size_t i = 0; i < leafidx.size(); ++i){
+      cerr << "Leaf " << i << " is " << node_names[leafidx[i]] << endl;
+    }
+
 
     if (!label_to_check.empty())
       cout << label_to_check << " "
@@ -139,3 +187,5 @@ main(int argc, const char **argv) {
   }
   return EXIT_SUCCESS;
 }
+
+
