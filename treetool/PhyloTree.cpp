@@ -599,6 +599,7 @@ PhyloTree::get_node_parent_idx(std::vector<size_t> &pa_idx)const{
 			       std::find(node_names.begin(), 
 					 node_names.end(), ancestor));
     pa_idx.push_back(idx);
+    //    cerr << "node" << i << " has parent" << ancestor << endl;
   }
 }
 
