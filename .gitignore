@@ -1,0 +1,16 @@
+# no .svn direcrories
+bin/
+# no compiled object file
+*.[oa]
+*.so
+# no temporary file
+*~
+*.out
+*.aux
+*.log
+*.eps
+*.tif
+*.dvi
+
+#ignore binary file
+treetool/treetool
