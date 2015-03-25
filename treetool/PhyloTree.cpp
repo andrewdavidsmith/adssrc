@@ -686,7 +686,7 @@ PhyloTree::find_common_ancestor(const vector<string> &names,
 				string &ancestor) const{
   if (!ancestor.empty()) 
     ancestor.erase(ancestor.begin(),ancestor.end());
-  bool found;
+  bool found = false;
   root.find_common_ancestor(names, ancestor, found);
   return found;
 }
