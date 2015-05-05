@@ -702,7 +702,7 @@ PhyloTree::trim_to_keep(const std::vector<std::string>& leaves){
 
 
 bool 
-PhyloTree::check_parsimony(const std::string &s){
+PhyloTree::check_parsimony(const std::string &s)const{
   vector<vector<size_t> > child_idx;
   get_node_child_idx(child_idx);
   assert( s.length() == child_idx.size());
