@@ -168,6 +168,8 @@ public:
 			    std::string &ancestor) const;
   void trim_to_keep(const std::vector<std::string>& leaves);
   
+  /* s is a string of characters corresponding to nodes in DFS order*/
+  bool check_parsimony(const std::string &s);
 private:
   PhyloTreeNode root;
 };

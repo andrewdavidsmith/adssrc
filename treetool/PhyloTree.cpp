@@ -701,6 +701,26 @@ PhyloTree::trim_to_keep(const std::vector<std::string>& leaves){
 }
 
 
+bool 
+PhyloTree::check_parsimony(const std::string &s){
+  vector<vector<size_t> > child_idx;
+  get_node_child_idx(child_idx);
+  assert( s.length() == child_idx.size());
+  for(size_t i = 0; i < child_idx.size(); ++i){
+    if(child_idx[i].size()){
+      bool mp = false;
+      for(size_t j = 0; j < child_idx[i].size(); ++j){
+        if (s.substr(i,1) ==  s.substr( child_idx[i][j],1))
+          mp = true; 
+      }
+      if (!mp )  return false;
+    }
+  }
+  return true; 
+}
+
+
+
 
 std::istream&
 operator>>(std::istream &in, PhyloTree &t) {
