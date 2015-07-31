@@ -58,7 +58,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include <algorithm>
+#include <algorithm> //find
 #include <numeric>
 #include <sstream>
 #include <bitset>
@@ -74,6 +74,7 @@ using std::vector;
 using std::endl;
 using std::cerr;
 using std::cout;
+using std::sort;
 using std::tr1::unordered_set;
 
 
@@ -109,9 +110,37 @@ check_unique_names(const string &s) {
   return is_unique;
 }
 
+string
+cbt_filled_to_newick(const vector<size_t> &filled_nodes, 
+                     const string prefix, 
+                     const size_t curnode){
+  vector<size_t>::const_iterator it;
+  it = find (filled_nodes.begin(), filled_nodes.end(), curnode);
+  assert (it != filled_nodes.end());
+  
+  it = find (filled_nodes.begin(), filled_nodes.end(), 2*curnode+1);
+  if (it !=filled_nodes.end()) { // has children
+    string lsubtree = cbt_filled_to_newick( filled_nodes, prefix, 2*curnode+1);
+    string rsubtree = cbt_filled_to_newick( filled_nodes, prefix, 2*curnode+2);
+    return "(" +lsubtree + "," + rsubtree + ")" + prefix + toa(curnode);
+  } else {
+    return prefix+toa(curnode);
+  }
+}
+
+// depth of node is 0-based
+string
+CBT_filled_to_newick(const vector<size_t> &filled_nodes, 
+                     const size_t maxdepth) {
+  assert(filled_nodes.size() <= pow(2, maxdepth+1)-1); 
+  string prefix = "n_";
+  string newick = cbt_filled_to_newick(filled_nodes, prefix, 0) + ";";
+  return newick ;
+}
+
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
-////  PHYLOTREENODE CLASS BELOW HERE                                   ////
+////  PHYLOTREENODE CLASS BELOW HERE                                ////
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
@@ -464,19 +493,37 @@ PhyloTreeNode::trim_to_keep(const std::vector<std::string>& leaves){
 
 
 bool
-PhyloTreeNode::set_branch(const string label, const double newlength){
-  if (name == label){
+PhyloTreeNode::set_branch(const string label, const double newlength) {
+  if (name == label) {
     branch = newlength;
     return true;
-  } else if (child.size()){
-    for(size_t i =0; i < child.size(); ++i){
-      if(child[i].set_branch(label, newlength))
+  } else if (child.size()) {
+    for (size_t i =0; i < child.size(); ++i) {
+      if (child[i].set_branch(label, newlength))
 	return true;
     } 
   } 
   return false;
 }
 
+void 
+PhyloTreeNode::embed_in_complete(const size_t cur_CBT_order, 
+                                 vector<size_t> &filled_nodes,
+                                 size_t &maxdepth) const {
+  if (has_children()) {
+    vector<PhyloTreeNode> children; 
+    get_child(children);
+    const size_t lid = 2*cur_CBT_order+1;
+    const size_t rid = 2*cur_CBT_order+2; 
+    filled_nodes.push_back(lid);
+    filled_nodes.push_back(rid);
+    size_t ldepth=maxdepth, rdepth=maxdepth;
+    children[0].embed_in_complete( lid, filled_nodes, ldepth); 
+    children[1].embed_in_complete( rid, filled_nodes, rdepth); 
+    maxdepth = (ldepth > rdepth) ? ldepth : rdepth; 
+    maxdepth +=1; 
+  }
+}
 
 
 
@@ -667,16 +714,12 @@ PhyloTree::get_all_heights(vector<size_t> &heights) const{
     heights.push_back(get_node_height(nodenames[i]));
   }
 }
-///////////////////////////////////
-
-
+///////////////////////////////////////////////////////////////////
 
 void
 PhyloTree::get_branches(std::vector<double> &branches) const{
   root.get_branches(branches);
 }
-
-
 
 /*Find the nearest common ancestor for a set of nodes in the tree
  *Return true if found;
@@ -691,8 +734,6 @@ PhyloTree::find_common_ancestor(const vector<string> &names,
   return found;
 }
 
-
-
 void 
 PhyloTree::trim_to_keep(const std::vector<std::string>& leaves){
   for(size_t i = 0; i < leaves.size(); ++i)
@@ -700,6 +741,15 @@ PhyloTree::trim_to_keep(const std::vector<std::string>& leaves){
   root.trim_to_keep(leaves);
 }
 
+void 
+PhyloTree::embed_in_complete(vector<size_t> &filled_nodes, 
+                             size_t &maxdepth) const {
+  filled_nodes.clear();
+  size_t cur_CBT_order = 0;
+  filled_nodes.push_back(cur_CBT_order);
+  maxdepth = 0; 
+  root.embed_in_complete(cur_CBT_order, filled_nodes, maxdepth); 
+}
 
 bool 
 PhyloTree::check_parsimony(const std::string &s)const{
@@ -718,9 +768,6 @@ PhyloTree::check_parsimony(const std::string &s)const{
   }
   return true; 
 }
-
-
-
 
 std::istream&
 operator>>(std::istream &in, PhyloTree &t) {

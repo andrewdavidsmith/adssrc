@@ -84,7 +84,7 @@ public:
   void set_branch(const double newlength) { branch = newlength;}
   bool set_branch(const std::string label, const double newlength);
   void set_name(const std::string newname) { name = newname;}
-  void set_child(std::vector<PhyloTreeNode> &newchild){
+  void set_child(std::vector<PhyloTreeNode> &newchild) {
     child.assign(newchild.begin(), newchild.end());
   }
   bool trim_to_keep(const std::vector<std::string>& leaves); 
@@ -98,15 +98,17 @@ public:
   size_t get_height() const{return height;}
   size_t get_leaf_num() const;
   size_t get_child_size() const {return child.size();}
-  void get_child_names(std::vector<std::string> &child_names)const;
-  void get_leaf_names(std::vector<std::string> &leaf_names)const;
+  void get_child_names(std::vector<std::string> &child_names) const;
+  void get_leaf_names(std::vector<std::string> &leaf_names) const;
   void get_clade_leaves(std::vector<std::tr1::unordered_set<std::string> > 
-			&clade_leaves)const;
-  void get_node_names(std::vector<std::string> &node_names)const;
+			&clade_leaves) const;
+  void get_node_names(std::vector<std::string> &node_names) const;
   void get_node_names(const std::string label, 
-		      std::vector<std::string> &node_names)const;
-  void get_branches(std::vector<double> &branches)const;
-
+		      std::vector<std::string> &node_names) const;
+  void get_branches(std::vector<double> &branches) const;
+  void embed_in_complete(const size_t cur_CBT_order, 
+                         std::vector<size_t> &filled_nodes,
+                         size_t &maxdepth) const; 
 private:
   std::vector<PhyloTreeNode> child;
   std::string name;
@@ -167,6 +169,9 @@ public:
   bool find_common_ancestor(const std::vector<std::string> &names, 
 			    std::string &ancestor) const;
   void trim_to_keep(const std::vector<std::string>& leaves);
+
+  void embed_in_complete(std::vector<size_t> &filled_nodes, 
+                         size_t &maxdepth) const;
   
   /* s is a string of characters corresponding to nodes in DFS order*/
   bool check_parsimony(const std::string &s)const;
@@ -187,5 +192,8 @@ combine_newick(const std::string s1, const std::string s2,
 	       const double branch1, const double branch2, 
 	       const double branch0);
 
+std::string
+CBT_filled_to_newick(const std::vector<size_t> &filled_nodes, 
+                     const size_t maxdepth);
 
 #endif
