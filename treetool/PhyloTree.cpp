@@ -100,7 +100,7 @@ check_unique_names(const string &s) {
     pos = s_copy.find_first_not_of("()0123456789:.,;");
     s_copy.erase(0,pos);
     if(!s_copy.empty()){
-      pos = s_copy.find_first_of("()0123456789:.,;");
+      pos = s_copy.find_first_of("():.,;");
       n = s_copy.substr(0,pos);
       s_copy.erase(0,pos);
       if (!names.insert(n).second)
