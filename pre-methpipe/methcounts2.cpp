@@ -232,23 +232,6 @@ get_chrom(const MappedRead &mr,
 }
 
 
-static void
-identify_chromosomes(const string chrom_file, const string fasta_suffix, 
-		     chrom_file_map &chrom_files) {
-  vector<string> the_files;
-  if (isdir(chrom_file.c_str()))
-    read_dir(chrom_file, fasta_suffix, the_files);
-  else the_files.push_back(chrom_file);
-  
-  for (size_t i = 0; i < the_files.size(); ++i) {
-    vector<string> names, seqs;
-    read_fasta_file(the_files[i], names, seqs);
-    for (size_t j = 0; j < names.size(); ++j)
-      chrom_files[names[j]] = the_files[i];
-  }
-}
-
-
 int 
 main(int argc, const char **argv) {
   

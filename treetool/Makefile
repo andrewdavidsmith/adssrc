@@ -1,6 +1,6 @@
-#    Copyright (C) 2014 Andrew D. Smith
+#    Copyright (C) 2015 Andrew D. Smith
 #
-#    Authors: Andrew D. Smith
+#    Authors: Jenny Qu,Andrew D. Smith
 #
 #    This code is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -16,58 +16,37 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-ifndef SMITHLAB_CPP
-$(error Must define SMITHLAB_CPP variable)
-endif
-
-PROGS = treetool
-
 SOURCES = $(wildcard *.cpp)
-INCLUDEDIRS = $(SMITHLAB_CPP)
-LIBS = -lgsl -lgslcblas # -lefence
-
-INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
-
+OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
 CXX = g++
-CXXFLAGS = -Wall -Wextra -fmessage-length=50 -std=c++0x
+CXXFLAGS = -Wall
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
+COMMON_DIR = $(SMITHLAB_CPP)
 
-ifeq "$(shell uname)" "Darwin"
-CFLAGS += -arch x86_64
-endif
-
-# Flags passed to the C++ compiler.
+# Flags for Mavericks
 ifeq "$(shell uname)" "Darwin"
 CXXFLAGS += -arch x86_64
+INCLUDEARGS += -I/usr/local/include
+LIBS += -L/usr/local/lib
 ifeq "$(shell if [ `sysctl -n kern.osrelease | cut -d . -f 1` -ge 13 ];\
-              then echo 'true'; fi)" "true"
-CXXFLAGS += -stdlib=libstdc++ 
+then echo 'true'; fi)" "true"
+CXXFLAGS += -stdlib=libstdc++
 endif
 endif
 
 ifdef DEBUG
 CXXFLAGS += $(DEBUGFLAGS)
 endif
-
 ifdef OPT
 CXXFLAGS += $(OPTFLAGS)
 endif
 
-all: $(PROGS)
-
-$(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
-	smithlab_utils.o OptionParser.o)
-
-treetool: PhyloTree.o 
+all: $(OBJECTS)
 
 %.o: %.cpp %.hpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
-
-%: %.cpp
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(INCLUDEARGS) $(LIBS)
-
+	$(CXX) $(CXXFLAGS) -I$(COMMON_DIR) -c -o $@ $<
 clean:
-	@-rm -f $(PROGS) *.o *.so *.a *~
+	@-rm -f *.o *~
 
 .PHONY: clean
