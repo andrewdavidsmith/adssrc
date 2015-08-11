@@ -33,7 +33,7 @@
   (A:0.1,B:0.2,(C:0.3,D:0.4):0.5);       distances and leaf names (popular)
   (A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;     distances and all names
   ((B:0.2,(C:0.3,D:0.4)E:0.5)F:0.1)A;    a tree rooted on a leaf node (rare)
-  
+
   ========================================================================
 
   (1) It seems like a tree always ends in a semicolon
@@ -67,42 +67,59 @@ using std::vector;
 using std::endl;
 using std::cerr;
 using std::cout;
+using std::tr1::unordered_set;
 
 
 static bool
 check_balanced_parentheses(const string &s) {
   int count = 0;
-  for (size_t i = 0; i < s.length() && count >= 0; ++i) {
+  for (size_t i = 0; i < s.length(); ++i) {
     if (s[i] == '(') ++count;
     if (s[i] == ')') --count;
   }
   return count == 0;
 }
 
-static bool
-check_unique_names(const string &s) {
-  /// ADS: this function is really poorly coded
-  bool is_unique=true;
-  string s_copy =s;
-  std::tr1::unordered_set<std::string> names;
-  size_t f1, f2;
-  while(!s_copy.empty()){
-    f1 = s_copy.find_first_not_of("()0123456789:,;");
-    s_copy.erase(0,f1);
-    if (s_copy.empty()) break;
-    f2 = s_copy.find_first_of("()0123456789:,;");
-    string name=s_copy.substr(0,f2);
-    if (names.find(name)== names.end()){
-      names.insert(name);
-    }
-    else {
-      is_unique=false; 
-      break;
-    }
-  }
-  return is_unique;
+
+// static bool
+// check_unique_names(const string &s) {
+//   /// ADS: this function is really poorly coded
+//   bool is_unique=true;
+//   string s_copy =s;
+//   unordered_set<string> names;
+//   size_t f1, f2;
+//   while (!s_copy.empty()) {
+//     f1 = s_copy.find_first_not_of("()0123456789:,;");
+//     s_copy.erase(0,f1);
+//     if (s_copy.empty()) break;
+//     f2 = s_copy.find_first_of("()0123456789:,;");
+//     string name=s_copy.substr(0,f2);
+//     if (names.find(name)== names.end()){
+//       names.insert(name);
+//     }
+//     else {
+//       is_unique=false;
+//       break;
+//     }
+//   }
+//   return is_unique;
+// }
+
+
+void
+PhyloTree::PTNode::swap(PTNode &other) {
+  std::swap(child, other.child);
+  std::swap(name, other.name);
+  std::swap(branch_length, other.branch_length);
 }
 
+size_t
+PhyloTree::PTNode::get_size() const {
+  size_t sz = 1;
+  for (size_t i = 0; i < child.size(); ++i)
+    sz += child[i].get_size();
+  return sz;
+}
 
 
 string
@@ -113,7 +130,6 @@ PhyloTree::PTNode::tostring(const size_t depth) const {
     oss << endl << child[i].tostring(depth + 1);
   return oss.str();
 }
-
 
 
 string
@@ -131,22 +147,6 @@ PhyloTree::PTNode::Newick_format() const {
 }
 
 
-
-/*Put names of all descendant leaf nodes into vector leaf_names*/
-void 
-PhyloTree::PTNode::get_leaf_names(vector<string> &leaf_names){
-  if (is_leaf()) {
-    assert(!name.empty());
-    leaf_names.push_back(name);
-  }
-  else {
-    for (size_t i = 0; i < child.size(); ++i)
-      child[i].get_leaf_names(leaf_names);
-  }
-}
-
-
-
 static bool
 represents_leaf(const string &tree_rep) {
   return (tree_rep.find_first_of(',') == string::npos);
@@ -156,13 +156,13 @@ represents_leaf(const string &tree_rep) {
 static string
 extract_name(const string &tree_rep) {
   const size_t final_parenthesis = tree_rep.find_last_of(")");
-  const size_t possible_name_start = 
+  const size_t possible_name_start =
     (final_parenthesis == string::npos) ? 0 : final_parenthesis + 1;
-  const size_t branch_len_start = 
-    std::min(tree_rep.find_first_of(":", possible_name_start), 
-             tree_rep.length());
+  const size_t branch_len_start =
+    std::min(tree_rep.find_first_of(":", possible_name_start),
+	     tree_rep.length());
   return string(tree_rep.begin() + possible_name_start,
-                tree_rep.begin() + branch_len_start);
+		tree_rep.begin() + branch_len_start);
 }
 
 
@@ -172,7 +172,7 @@ extract_branch_length(const string &tree_rep) {
   const size_t colon_pos = tree_rep.find_first_of(":", final_parenthesis + 1);
   if (colon_pos == string::npos)
     return 0.0;
-  const size_t non_numeric = 
+  const size_t non_numeric =
     tree_rep.find_first_not_of("0123456789.", colon_pos + 1);
   if (non_numeric == 0)
     return 0.0;
@@ -183,7 +183,7 @@ extract_branch_length(const string &tree_rep) {
 static bool
 root_has_name(const string &tree_rep) {
   const size_t final_parenthesis = tree_rep.find_last_of(")");
-  const size_t possible_name_start = 
+  const size_t possible_name_start =
     (final_parenthesis == string::npos) ? 0 : final_parenthesis;
   return (tree_rep[possible_name_start] != ':');
 }
@@ -191,10 +191,10 @@ root_has_name(const string &tree_rep) {
 
 static void
 extract_subtrees(const string &tree_rep,
-                 vector<string> &subtree_reps) {
+		 vector<string> &subtree_reps) {
   const size_t offset = (tree_rep[0] == '(') ? 1 : 0;
-  const string tmp(tree_rep.begin() + offset, 
-                   tree_rep.begin() + tree_rep.find_last_of(")"));
+  const string tmp(tree_rep.begin() + offset,
+		   tree_rep.begin() + tree_rep.find_last_of(")"));
   vector<size_t> split_points;
   size_t p_count = 0;
   for (size_t i = 0; i < tmp.length(); ++i) {
@@ -207,23 +207,60 @@ extract_subtrees(const string &tree_rep,
   subtree_reps.push_back(tmp.substr(0, split_points[0]));
   for (size_t i = 0; i < split_points.size() - 1; ++i)
     subtree_reps.push_back(string(tmp.begin() + split_points[i] + 1,
-                                  tmp.begin() + split_points[i + 1]));
+				  tmp.begin() + split_points[i + 1]));
 }
 
 
 PhyloTree::PTNode::PTNode(const string &tree_rep) {
   // This function needs to test the various ways that a string can be
   // passed in to represent a subtree at the current node
-  
+
   branch_length = extract_branch_length(tree_rep);
   if (root_has_name(tree_rep))
     name = extract_name(tree_rep);
-  
+
   if (!represents_leaf(tree_rep)) {
     vector<string> subtree_reps;
     extract_subtrees(tree_rep, subtree_reps);
     for (size_t i = 0; i < subtree_reps.size(); ++i)
       child.push_back(PTNode(subtree_reps[i]));
+  }
+}
+
+void
+PhyloTree::PTNode::copy_subtree_with_species(const PTNode &t,
+					     const
+					     unordered_set<string> &species,
+					     PTNode &u) {
+  if (t.is_leaf()) {
+    if (species.find(t.name) != species.end()) {
+      u.name = t.name;
+      u.branch_length = t.branch_length;
+    }
+  }
+  else {
+
+    vector<PTNode> children;
+    for (size_t i = 0; i < t.child.size(); ++i) {
+      PTNode v;
+      copy_subtree_with_species(t.child[i], species, v);
+      if (v.has_children() || !v.name.empty()) {
+	children.push_back(PTNode());
+	children.back().swap(v);
+      }
+    }
+
+    if (children.size() > 0) {
+      if (children.size() == 1) {
+	u.swap(children.front());
+	u.branch_length += t.branch_length;
+      }
+      else {
+	u.name = t.name;
+	u.branch_length = t.branch_length;
+	u.child.swap(children);
+      }
+    }
   }
 }
 
@@ -237,31 +274,32 @@ PhyloTree::PTNode::PTNode(const string &tree_rep) {
 
 
 PhyloTree::PhyloTree(string tree_rep) {
-  if(!check_balanced_parentheses(tree_rep))
-    throw SMITHLABException("Unbalanced parentheses in the string representation.");
+  if (!check_balanced_parentheses(tree_rep))
+    throw SMITHLABException("Unbalanced parentheses in Newick format: " +
+			    tree_rep);
   // remove whitespace
-  string::iterator w = 
+  string::iterator w =
     std::remove_copy_if(tree_rep.begin(), tree_rep.end(),
-                        tree_rep.begin(), &isspace);
+			tree_rep.begin(), &isspace);
   assert(w != tree_rep.begin());
-  tree_rep.erase(--w, tree_rep.end()); // The "--w" is for the ";"
+  if (*(w - 1) == ';')
+    tree_rep.erase(--w, tree_rep.end()); // The "--w" is for the ";"
 
   /* ADS: requirement for unique names should only apply to leafs
    */
-
   // if (!check_unique_names(tree_rep))
   //   throw SMITHLABException("duplicate names in: " + tree_rep);
-  
+
   root = PTNode(tree_rep);
 }
 
 
-
 void
-PhyloTree::get_leaf_names(vector<string> & leaf_names){
-  root.get_leaf_names(leaf_names);
+PhyloTree::copy_subtree_with_species(const PhyloTree &t,
+				     const unordered_set<string> &species,
+				     PhyloTree &u) {
+  PTNode::copy_subtree_with_species(t.root, species, u.root);
 }
-
 
 
 std::istream&

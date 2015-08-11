@@ -55,6 +55,7 @@
 
 #include <string>
 #include <vector>
+#include <tr1/unordered_set>
 
 
 class PhyloTree {
@@ -62,29 +63,34 @@ public:
   PhyloTree() {}
   PhyloTree(std::string tree_rep);
 
+  size_t get_size() const {return root.get_size();}
   std::string tostring() const {return root.tostring();}
-
-  /// ADS: This function seems to be designed to print a subtree
-  /// rooted at a given node. The only way this makes sense is if you
-  /// can actually obtain such a subtree as an actual tree, and if
-  /// that were true, then you should just do that and use the other
-  /// tostring function.
-  std::string tostring(const std::string &label) const;
   std::string Newick_format() const {return root.Newick_format() + ";";}
-  void get_leaf_names(std::vector<std::string> &leaf_names );
 
+  static void
+  copy_subtree_with_species(const PhyloTree &t, 
+			    const std::tr1::unordered_set<std::string> &species,
+			    PhyloTree &u);
+  
 protected:
   
   struct PTNode {
     PTNode() {}
     PTNode(const std::string &subtree_string);
-  
+    void swap(PTNode &other);
+    
     bool has_children() const {return !child.empty();}
     bool is_leaf() const {return child.empty();}
-    
+    size_t get_size() const;
+
     std::string tostring(const size_t depth = 0) const;
     std::string Newick_format() const;
-    void get_leaf_names(std::vector<std::string> &leaf_names);
+    
+    static void
+    copy_subtree_with_species(const PTNode &t, 
+			      const std::tr1::unordered_set<std::string> 
+			      &species,
+			      PTNode &u);
     
     std::vector<PTNode> child;
     std::string name;

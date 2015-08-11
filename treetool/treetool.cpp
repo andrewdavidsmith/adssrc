@@ -44,6 +44,7 @@ using std::endl;
 using std::cerr;
 using std::cout;
 using std::tr1::unordered_set;
+using std::istream_iterator;
 
 
 
@@ -54,20 +55,17 @@ main(int argc, const char **argv) {
     
     bool VERBOSE = false;
     string outfile;
-    string label_to_check;
+    string species_file;
     
     /****************** COMMAND LINE OPTIONS ********************/
     OptionParser opt_parse(strip_path(argv[0]), 
-			   "manipulate Newick format "
-			   "phylogenetic trees",
+			   "manipulate Newick format phylogenetic trees",
 			   "<newick-input>");
-    opt_parse.add_opt("output", 'o', 
-		      "Name of output file (default: stdout)", 
+    opt_parse.add_opt("output", 'o', "output file (default: stdout)", 
 		      false, outfile);
-    opt_parse.add_opt("label", 'l', "check if this label exists", 
-		      false, label_to_check);
-    opt_parse.add_opt("verbose", 'v', "print more run info", 
-		      false, VERBOSE);
+    opt_parse.add_opt("species", 's', "species defining subtree to extract",
+		      false, species_file);
+    opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
@@ -92,90 +90,28 @@ main(int argc, const char **argv) {
     
     std::ifstream in(newick_file.c_str());
     if (!in)
-      throw SMITHLABException("bad file: " + newick_file);
+      throw SMITHLABException("problem reading file: " + newick_file);
     
     string nw;
-    in >> nw;
+    getline(in, nw);
+
     PhyloTree t(nw);
-    size_t namesuf = 1;
-    t.fill_names("INT",namesuf);
+    cout << "tree format valid" << endl;
+    cout << "number of nodes: " << t.get_size() << endl;
     
-    /***** get common ancestor of 2 random selected leaves. ****/
-    // string ancestor;
-    // vector<string> leaf_names;
-    // t.get_leaf_names(leaf_names); 
+    if (!species_file.empty()) {
+      std::ifstream spec_in(species_file.c_str());
+      unordered_set<string> species((istream_iterator<string>(spec_in)), 
+				    istream_iterator<string>());
 
-    // srand(time(0));
-    // std::random_shuffle(leaf_names.begin(), leaf_names.end());
-    // vector<string> tmp;
-    // for(size_t i =0; i < 2; ++i)
-    //   tmp.push_back(leaf_names[i]);
-
-    //  cerr << "the common ancestor of "  ;
-    //  copy(tmp.begin(), tmp.end(), 
-    //      std::ostream_iterator<string>(cerr, ","));
-    
-    // t.find_common_ancestor(tmp, ancestor);
-    // cerr << "is " <<  (ancestor.empty() ? "not found" : ancestor) << endl; 
-    
-    // // print subtree rooted at ancestor
-    // cout << t.Newick_format(ancestor) << endl;
-    
-    /**** trim tree *******/
-    // t.trim_to_keep(tmp);
-    // cout << "After trimming:" << endl 
-    // 	 << t.Newick_format() << endl;
-
-    /**** combine tree *****/
-    // string s1 = t.Newick_format(tmp[0]);
-    // string s2 = t.Newick_format(tmp[1]);
-    // string sc = combine_newick(s1, s2, "root", 0.1, 0.2, 0.3);
-    // cerr << "combining "<< s1 << " and " << s2 << endl << sc << endl;
-    // PhyloTree t2(sc);
-    // cerr << t2.get_root_branch() << endl;
-
-    // t.set_branch(leaf_names[2], 3000);
-    // cerr << t.Newick_format()<< endl;
-
-    vector<size_t> pa_idx;
-    t.get_node_parent_idx(pa_idx);
-
-    vector<string> node_names;
-    t.get_node_names(node_names);
-    vector<vector<size_t> > child_idx;
-    t.get_node_child_idx(child_idx);
-    vector<size_t> heights;
-    t.get_all_heights(heights);
-
-    for(size_t i = 0; i < node_names.size(); ++i){
-      cerr << "node " << node_names[i] << " has height " 
-	   << heights[i] << "\tparent\t";
-      if( pa_idx[i]==node_names.size())
-	cerr << "NA;\t";
-      else 
-	cerr << node_names[pa_idx[i]] << ";\t";
-
-      cerr << " and children \t";
-      if(child_idx[i].size()==0)
-	cerr << "NA" << endl;
-      else{
-	for(size_t j = 0; j < child_idx[i].size(); ++j )
-	  cerr << node_names[child_idx[i][j]] << "\t";
-	cerr << endl;
-      }
+      PhyloTree u;
+      PhyloTree::copy_subtree_with_species(t, species, u);
+      
+      std::ofstream of;
+      if (!outfile.empty()) of.open(outfile.c_str());
+      std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
+      out << u << endl;
     }
-
-    vector<size_t> leafidx;
-    t.get_leaf_idx(leafidx);
-    for(size_t i = 0; i < leafidx.size(); ++i){
-      cerr << "Leaf " << i << " is " << node_names[leafidx[i]] << endl;
-    }
-
-
-    if (!label_to_check.empty())
-      cout << label_to_check << " "
-	   << (t.label_exists(label_to_check) ? 
-	       "exists" : "does not exist") << endl;
   }
   catch (const SMITHLABException &e) {
     cerr << e.what() << endl;
@@ -187,5 +123,3 @@ main(int argc, const char **argv) {
   }
   return EXIT_SUCCESS;
 }
-
-
