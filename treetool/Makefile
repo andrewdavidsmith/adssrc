@@ -16,13 +16,26 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+PROGS = treetool
+
+ifndef SMITHLAB_CPP
+$(error SMITHLAB_CPP variable undefined)
+endif
+
+## Macro below (careful of whitespace when calling)
+not-containing = $(foreach v,$2,$(if $(findstring $1,$v),,$v))
+
 SOURCES = $(wildcard *.cpp)
-OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
+OBJSOURCES = $(call not-containing,$(PROGS),$(SOURCES))
+OBJECTS = $(patsubst %.cpp,%.o,$(OBJSOURCES))
+
 CXX = g++
 CXXFLAGS = -Wall
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
-COMMON_DIR = $(SMITHLAB_CPP)
+
+INCLUDEDIRS :=  $(SMITHLAB_CPP) $(METHPIPE_ROOT)
+INCLUDEARGS := $(addprefix -I,$(INCLUDEDIRS))
 
 # Flags for Mavericks
 ifeq "$(shell uname)" "Darwin"
@@ -42,11 +55,18 @@ ifdef OPT
 CXXFLAGS += $(OPTFLAGS)
 endif
 
-all: $(OBJECTS)
+all: $(PROGS)
+
+$(PROGS): PhyloTree.o \
+	$(addprefix $(SMITHLAB_CPP)/, \
+	OptionParser.o smithlab_utils.o smithlab_os.o)
 
 %.o: %.cpp %.hpp
-	$(CXX) $(CXXFLAGS) -I$(COMMON_DIR) -c -o $@ $<
-clean:
-	@-rm -f *.o *~
+	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
 
+%: %.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(INCLUDEARGS) $(LIBS)
+
+clean:
+	@-rm -f *.o *~ $(PROGS)
 .PHONY: clean
