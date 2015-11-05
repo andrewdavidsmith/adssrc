@@ -1,7 +1,8 @@
-/*    binmeth: average methylation in jumping bins (sliding windows
- *    with step size)
+/*    binmeth: a program to compute methylation levels in genomic bins
+ *    (fixed width intervals that partition the genome).
  *
- *    Copyright (C) 2014 Andrew D. Smith
+ *    Copyright (C) 2015  University of Southern California and
+ *                        Andrew D. Smith
  *
  *    Authors: Andrew D. Smith
  *
@@ -14,25 +15,18 @@
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
  *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *    GNU General Public License for more details.
- *
- *    You should have received a copy of the GNU General Public License
- *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <string>
 #include <vector>
 #include <iostream>
-#include <iterator>
 #include <fstream>
-#include <algorithm>
 #include <numeric>
-#include <list>
-#include <utility>
+#include <tr1/cmath>
 
 #include "OptionParser.hpp"
 #include "smithlab_utils.hpp"
 #include "smithlab_os.hpp"
-#include "GenomicRegion.hpp"
 #include "MethpipeFiles.hpp"
 
 #include "bsutils.hpp"
@@ -42,125 +36,202 @@ using std::vector;
 using std::cout;
 using std::cerr;
 using std::endl;
-using std::pair;
-using std::ios_base;
+
+struct Site {
+  string chrom;
+  size_t pos;
+  string strand;
+  string context;
+  double meth;
+  size_t n_reads;
+
+  size_t n_meth() const {return std::tr1::round(meth*n_reads);}
+
+  void add(const Site &other) {
+    if (!is_mutated() && other.is_mutated())
+      context += 'x';
+    // ADS: order matters below as n_reads update invalidates n_meth()
+    // function until meth has been updated
+    const size_t total_c_reads = n_meth() + other.n_meth();
+    n_reads += other.n_reads;
+    meth = static_cast<double>(total_c_reads)/n_reads;
+  }
+
+  // ADS: function below has redundant check for is_cpg, which is
+  // expensive and might be ok to remove
+  bool is_mate_of(const Site &first) {
+    return (first.pos + 1 == pos && first.is_cpg() && is_cpg() &&
+            first.strand == "+" && strand == "-");
+  }
+  ////////////////////////////////////////////////////////////////////////
+  /////  Functions below test the type of site. These are CpG, CHH, and
+  /////  CHG divided into two kinds: CCG and CXG, the former including a
+  /////  CpG within. Also included is a function that tests if a site
+  /////  has a mutation.
+  /////  WARNING: None of these functions test for the length of their
+  /////  argument string, which could cause problems.
+  ////////////////////////////////////////////////////////////////////////
+  bool is_cpg() const {
+    return (context[0] == 'C' && context[1] == 'p' && context[2] == 'G');
+  }
+  bool is_chh() const {
+    return (context[0] == 'C' && context[1] == 'H' && context[2] == 'H');
+  }
+  bool is_ccg() const {
+    return (context[0] == 'C' && context[1] == 'C' && context[2] == 'G');
+  }
+  bool is_cxg() const {
+    return (context[0] == 'C' && context[1] == 'X' && context[2] == 'G');
+  }
+  bool is_mutated() const {
+    return context[3] == 'x';
+  }
+};
 
 
-static pair<bool, bool>
-meth_unmeth_calls(const size_t n_meth, const size_t n_unmeth) {
-  static const double alpha = 0.95;
-  // get info for binomial test
-  double lower = 0.0, upper = 0.0;
-  const size_t total = n_meth + n_unmeth;
-  wilson_ci_for_binomial(alpha, total,
-                         static_cast<double>(n_meth)/total, lower, upper);
-  return std::make_pair(lower > 0.5, upper < 0.5);
+struct CountSet {
+  size_t total_sites;
+  size_t sites_covered;
+  size_t max_coverage;
+  size_t mutations;
+  size_t total_c, total_t;
+  size_t called_meth, called_unmeth;
+  double mean_agg;
+  CountSet() : total_sites(0), sites_covered(0), max_coverage(0),
+    mutations(0), total_c(0), total_t(0),
+    called_meth(0), called_unmeth(0),
+    mean_agg(0.0) {}
+
+  static void
+  clear_counts(CountSet &cpg, CountSet &cpg_symm, CountSet &chh,
+               CountSet &cxg, CountSet &ccg, CountSet &all_c);
+
+  void update(const Site &s) {
+    if (s.is_mutated()) {
+      ++mutations;
+    }
+    else if (s.n_reads > 0) {
+      ++sites_covered;
+      max_coverage = std::max(max_coverage, s.n_reads);
+      total_c += s.n_meth();
+      total_t += s.n_reads - s.n_meth();
+      mean_agg += s.meth;
+      double lower = 0.0, upper = 0.0;
+      wilson_ci_for_binomial(alpha, s.n_reads, s.meth, lower, upper);
+      called_meth += (lower > 0.5);
+      called_unmeth += (upper < 0.5);
+    }
+    ++total_sites;
+  }
+
+  size_t coverage() const {return total_c + total_t;}
+  size_t total_called() const {return called_meth + called_unmeth;}
+
+  double weighted_mean_meth() const {
+    return static_cast<double>(total_c)/coverage();
+  }
+  double fractional_meth() const {
+    return static_cast<double>(called_meth)/total_called();
+  }
+  double mean_meth() const {
+    return mean_agg/sites_covered;
+  }
+
+  string format_summary(const string &context) const {
+    std::ostringstream oss;
+    const bool good = (sites_covered != 0);
+    oss << "METHYLATION LEVELS (" + context + " CONTEXT):\n"
+        << '\t' << "sites" << '\t' << total_sites << '\n'
+        << '\t' << "sites_covered" << '\t' << sites_covered << '\n'
+        << '\t' << "fraction_covered" << '\t'
+        << static_cast<double>(sites_covered)/total_sites << '\n'
+        << '\t' << "mean_depth" << '\t'
+        << static_cast<double>(coverage())/total_sites << '\n'
+        << '\t' << "mean_depth_covered" << '\t'
+        << static_cast<double>(coverage())/sites_covered << '\n'
+        << '\t' << "max_depth" << '\t' << max_coverage << '\n'
+        << '\t' << "mutations" << '\t' << mutations << '\n'
+        << '\t' << "mean_meth" << '\t'
+        << (good ? toa(mean_meth()) : "N/A")  << '\n'
+        << '\t' << "w_mean_meth" << '\t'
+        << (good ? toa(weighted_mean_meth()) : "N/A") << '\n'
+        << '\t' << "frac_meth" << '\t'
+        << (good ? toa(fractional_meth()) : "N/A");
+    return oss.str();
+  }
+
+  static double alpha;
+};
+
+double CountSet::alpha = 0.95;
+
+void
+CountSet::clear_counts(CountSet &cpg, CountSet &cpg_symm, CountSet &chh,
+                       CountSet &cxg, CountSet &ccg, CountSet &all_c) {
+  cpg = CountSet();
+  cpg_symm = CountSet();
+  chh = CountSet();
+  cxg = CountSet();
+  ccg = CountSet();
+  all_c = CountSet();
 }
 
 
 
-static std::pair<size_t, size_t>
-region_bounds(const vector<SimpleGenomicRegion> &sites,
-              const GenomicRegion &region) {
-  SimpleGenomicRegion a(region);
-  a.set_end(a.get_start() + 1);
-  vector<SimpleGenomicRegion>::const_iterator a_insert =
-    lower_bound(sites.begin(), sites.end(), a);
-  
-  SimpleGenomicRegion b(region);
-  b.set_start(b.get_end());
-  b.set_end(b.get_end() + 1);
-  vector<SimpleGenomicRegion>::const_iterator b_insert =
-    lower_bound(sites.begin(), sites.end(), b);
-  
-  return std::make_pair(a_insert - sites.begin(),
-                        b_insert - sites.begin());
+static bool
+get_meth_unmeth(const bool IS_METHPIPE_FILE,
+                std::ifstream &in, Site &site) {
+  return (IS_METHPIPE_FILE ?
+          methpipe::read_site(in, site.chrom, site.pos, site.strand,
+                              site.context, site.meth, site.n_reads) :
+          methpipe::read_site_old(in, site.chrom, site.pos, site.strand,
+                                  site.context, site.meth, site.n_reads));
 }
 
 
 
 static void
-not_methpipe_load_cpgs(const string &cpgs_file, 
-                       vector<SimpleGenomicRegion> &cpgs,
-                       vector<pair<double, double> > &meths,
-                       vector<size_t> &reads) {
-  
-  vector<GenomicRegion> cpgs_in;
-  ReadBEDFile(cpgs_file, cpgs_in);
-  assert(check_sorted(cpgs_in));
-  if (!check_sorted(cpgs_in))
-    throw SMITHLABException("regions not sorted in file: " + cpgs_file);
-  
-  for (size_t i = 0; i < cpgs_in.size(); ++i) {
-    cpgs.push_back(SimpleGenomicRegion(cpgs_in[i]));
-    const string name(cpgs_in[i].get_name());
-    const size_t total = atoi(smithlab::split(name, ":").back().c_str());
-    const double meth_freq = cpgs_in[i].get_score();
-    const size_t n_meth = roundf(meth_freq*total);
-    const size_t n_unmeth = roundf((1.0 - meth_freq)*total);
-    assert(n_meth + n_unmeth == total);
-    reads.push_back(total);
-    meths.push_back(std::make_pair(n_meth, n_unmeth));
-  }
+write_interval(const string &chrom_name,
+               const size_t start_pos, const size_t bin_size,
+               const CountSet &cpg, const CountSet &cpg_symm,
+               const CountSet &chh, const CountSet &cxg,
+               const CountSet &ccg, const CountSet &all_c,
+               std::ostream &out) {
+
+  out << chrom_name << '\t'
+      << start_pos << '\t'
+      << start_pos + bin_size << '\t'
+      << cpg.total_sites << ':'
+      << cpg.sites_covered << ':'
+      << cpg.total_c << ':'
+      << cpg.coverage() << '\t'
+      << cpg.weighted_mean_meth() << '\t'
+      << '+' << endl;
 }
 
 
-
-static void
-compute_for_window(const vector<pair<double, double> > &meths, 
-                   const vector<size_t> &reads,
-                   const size_t bounds_first, 
-                   const size_t bounds_second,
-                   size_t &meth, size_t &read, size_t &cpgs_with_reads,
-                   size_t &called_total, size_t &called_meth, 
-                   double &mean_meth) {
-  for (size_t j = bounds_first; j < bounds_second; ++j) {
-    if (reads[j] > 0) {
-      meth += static_cast<size_t>(meths[j].first);
-      read += reads[j];
-      ++cpgs_with_reads;
-      
-      const pair<bool, bool> calls = 
-        meth_unmeth_calls(meths[j].first, meths[j].second);
-      called_total += (calls.first || calls.second);
-      called_meth += calls.first;
-      
-      mean_meth += static_cast<double>(meths[j].first)/reads[j];
-    } 
-  }
-}
-
-
-
-int 
+int
 main(int argc, const char **argv) {
-  
-  try {
-    
-    bool VERBOSE = false;
-    bool PRINT_NAN = false;
-    bool PRINT_ADDITIONAL_LEVELS = false;
 
+  try {
+
+    bool VERBOSE = false;
     size_t bin_size = 1000;
-    size_t jump_size = 1000;
     string outfile;
-    
+
     /****************** COMMAND LINE OPTIONS ********************/
-    OptionParser opt_parse(strip_path(argv[0]), "Compute average CpG "
-                           "methylation in each of a set of genomic intervals", 
-                           "<intervals-bed> <cpgs-bed>");
-    opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
+    OptionParser opt_parse(strip_path(argv[0]), "compute methylation levels",
+                           "<methcounts-file>");
+    opt_parse.add_opt("output", 'o', "output file (default: stdout)",
                       false, outfile);
-    opt_parse.add_opt("bin", 'b', "bin size", false, bin_size);
-    opt_parse.add_opt("jump", 'j', "amount to jump", false, jump_size);
-    opt_parse.add_opt("print-nan", 'P', "print all records (even if NaN score)", 
-                      false, PRINT_NAN);
-    opt_parse.add_opt("more-levels", 'M', "print more meth level information", 
-                      false, PRINT_ADDITIONAL_LEVELS);
+    opt_parse.add_opt("binsize", 'b', "size of bins",
+                      false, bin_size);
+    opt_parse.add_opt("alpha", 'a', "alpha for confidence interval",
+                      false, CountSet::alpha);
     opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
-    if (argc == 1 || opt_parse.help_requested()) {
+    if (opt_parse.help_requested()) {
       cerr << opt_parse.help_message() << endl
            << opt_parse.about_message() << endl;
       return EXIT_SUCCESS;
@@ -173,84 +244,67 @@ main(int argc, const char **argv) {
       cerr << opt_parse.option_missing_message() << endl;
       return EXIT_SUCCESS;
     }
-    if (leftover_args.size() != 2) {
+    if (leftover_args.size() != 1) {
       cerr << opt_parse.help_message() << endl;
       return EXIT_SUCCESS;
     }
-    const string regions_file = leftover_args.front();
-    const string cpgs_file = leftover_args.back();
+    const string meth_file = leftover_args.front();
     /****************** END COMMAND LINE OPTIONS *****************/
-    
-    if (VERBOSE)
-      cerr << "FORMAT = NAME : CPGS : CPGS_WITH_READS : "
-        "METH_READS : TOTAL_READS" << endl;
-    
-    vector<GenomicRegion> regions;
-    ReadBEDFile(regions_file, regions);
-    assert(check_sorted(regions));
-    if (!check_sorted(regions))
-      throw SMITHLABException("regions not sorted in file: " + regions_file);
-    
+
+    std::ifstream in(meth_file.c_str());
+    if (!in)
+      throw SMITHLABException("bad input file: " + meth_file);
+    const bool IS_METHPIPE_FILE = methpipe::is_methpipe_file_single(meth_file);
+
+    CountSet cpg, cpg_symm, chh, cxg, ccg, all_c;
+    Site site, prev_site;
+
+    size_t start_pos = 0ul;
+
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());
-    std::ostream out(outfile.empty() ? cout.rdbuf() : of.rdbuf());
-    
-    const bool METHPIPE_FORMAT = 
-      methpipe::is_methpipe_file_single(cpgs_file);
+    std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
-    if (VERBOSE)
-      cerr << "CPG FILE FORMAT: " 
-           << (METHPIPE_FORMAT ? "METHPIPE" : "BED") << endl;
+    string chrom_name;
 
-    vector<SimpleGenomicRegion> cpgs;
-    vector<pair<double, double> > meths;
-    vector<size_t> reads;
-    if (METHPIPE_FORMAT) 
-      methpipe::load_cpgs(cpgs_file, cpgs, meths, reads);
-    else 
-      not_methpipe_load_cpgs(cpgs_file, cpgs, meths, reads);
-    
-    for (size_t i = 0; i < regions.size(); ++i) {
+    while (get_meth_unmeth(IS_METHPIPE_FILE, in, site)) {
 
-      const string chrom(regions[i].get_chrom());
-      
-      if (VERBOSE)
-        cerr << chrom << endl;
-      
-      const std::pair<size_t, size_t> bounds(region_bounds(cpgs, regions[i]));
-      size_t start_cpg = bounds.first;
-      size_t end_cpg = bounds.first;
-      for (size_t j = 0; j < regions[i].get_end(); j += jump_size) {
-        
-        while (start_cpg < cpgs.size() && cpgs[start_cpg].get_start() < j)
-          ++start_cpg;
-        
-        while (end_cpg < cpgs.size() && cpgs[end_cpg].get_start() < j + bin_size)
-          ++end_cpg;
-        
-        size_t meth = 0, read = 0;
-        size_t cpgs_with_reads = 0;
-        size_t called_total = 0, called_meth = 0;
-        double mean_meth = 0.0;
-        
-        compute_for_window(meths, reads,
-                           start_cpg, end_cpg,
-                           meth, read, cpgs_with_reads,
-                           called_total, called_meth, mean_meth);
-        
-        if (PRINT_NAN || std::isfinite(regions[i].get_score())) {
-          out << chrom << '\t' << j << '\t' << j + bin_size << '\t'
-              << end_cpg - start_cpg << '\t'
-              << cpgs_with_reads << '\t'
-              << meth << '\t'
-              << read << '\t'
-              << static_cast<double>(meth)/read << '\t' 
-              << static_cast<double>(called_meth)/called_total << '\t'
-              << mean_meth/cpgs_with_reads
-              << endl;
+      // need to make sure chrom variable has right chrom for printing
+
+      while (start_pos + bin_size < site.pos) {
+        if (chrom_name.empty())
+          prev_site.chrom = site.chrom;
+        write_interval(prev_site.chrom, start_pos, bin_size,
+                       cpg, cpg_symm, chh, cxg, ccg, all_c, out);
+        start_pos += bin_size;
+        CountSet::clear_counts(cpg, cpg_symm, chh, cxg, ccg, all_c);
+      }
+
+      if (site.chrom != prev_site.chrom)
+        if (VERBOSE)
+          cerr << "PROCESSING:\t" << site.chrom << "\n";
+
+      if (site.is_cpg()) {
+        cpg.update(site);
+        if (site.is_mate_of(prev_site)) {
+          site.add(prev_site);
+          cpg_symm.update(site);
         }
       }
+      else if (site.is_chh())
+        chh.update(site);
+      else if (site.is_ccg())
+        ccg.update(site);
+      else if (site.is_cxg())
+        cxg.update(site);
+      else
+        throw SMITHLABException("bad site context: " + site.context);
+
+      all_c.update(site);
+
+      prev_site = site;
     }
+
   }
   catch (const SMITHLABException &e) {
     cerr << e.what() << endl;
