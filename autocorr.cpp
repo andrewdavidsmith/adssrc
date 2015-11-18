@@ -59,14 +59,55 @@ corr(const vector<T> &x, const vector<T> &y) {
 }
 
 
+static bool
+region_precedes_site(const vector<GenomicRegion> &regions,
+                     const size_t region_idx, const MSite &s) {
+  return (region_idx < regions.size() &&
+          (regions[region_idx].get_chrom() < s.chrom ||
+           (regions[region_idx].get_chrom() == s.chrom &&
+            regions[region_idx].get_end() <= s.pos)));
+}
+
+static bool
+region_contains_site(const vector<GenomicRegion> &regions,
+                     const size_t region_idx, const MSite &s) {
+  // !!! ASSUMES REGION DOES NOT PRECEDE SITE
+  return (region_idx < regions.size() &&
+          regions[region_idx].get_chrom() == s.chrom &&
+          regions[region_idx].get_start() <= s.pos);
+}
+
+
+static size_t
+boundary_next_to_site(const vector<GenomicRegion> &regions,
+                      size_t &region_idx, const MSite &s) {
+  size_t b = s.pos;
+  while (region_precedes_site(regions, region_idx, s))
+    ++region_idx;
+  const bool contained = region_contains_site(regions, region_idx, s);
+  if (contained) b = regions[region_idx].get_end();
+  else
+    if (regions[region_idx].get_chrom() == s.chrom)
+      b = regions[region_idx].get_start();
+    else b = std::numeric_limits<size_t>::max(); 
+
+  return b;
+}
+
+
 static void
-process_chrom(const size_t min_reads, const size_t max_dist,
+process_chrom(const bool not_span, const vector<GenomicRegion> &regions,
+              size_t &region_idx,
+              const size_t min_reads, const size_t max_dist,
               const vector<MSite> &sites,
               vector<vector<methType> > &a, vector<vector<methType> > &b) {
-
-  for (size_t i = 0; i < sites.size(); ++i)
+  
+  for (size_t i = 0; i < sites.size(); ++i) {
     if (sites[i].n_reads >= min_reads) {
-      const size_t pos_limit = sites[i].pos + max_dist;
+      size_t pos_limit = sites[i].pos + max_dist;
+      if (not_span)
+        pos_limit = std::min(pos_limit,
+            boundary_next_to_site(regions, region_idx, sites[i-1]));
       size_t j = i + 1;
       while (j < sites.size() && sites[j].pos <= pos_limit) {
         if (sites[j].n_reads >= min_reads) {
@@ -77,11 +118,15 @@ process_chrom(const size_t min_reads, const size_t max_dist,
         ++j;
       }
     }
+  }
 }
 
 
 static void
-process_chrom_nearest(const size_t min_reads, const size_t max_dist,
+process_chrom_nearest(const bool not_span,
+                      const vector<GenomicRegion> &regions,
+                      size_t &region_idx,
+                      const size_t min_reads, const size_t max_dist,
                       const vector<MSite> &sites,
                       vector<vector<methType> > &a,
                       vector<vector<methType> > &b) {
@@ -90,7 +135,10 @@ process_chrom_nearest(const size_t min_reads, const size_t max_dist,
     if (sites[i].n_reads >= min_reads &&
         sites[i - 1].n_reads >= min_reads) {
       const size_t dist = sites[i].pos - sites[i - 1].pos;
-      if (dist <= max_dist) {
+      const size_t r = not_span
+                       ? boundary_next_to_site(regions, region_idx, sites[i-1])
+                       : 0;
+      if (dist <= max_dist && (!not_span || sites[i].pos < r)) {
         a[dist].push_back(sites[i-1].meth);
         b[dist].push_back(sites[i].meth);
       }
@@ -105,6 +153,7 @@ report_progress_to_stderr(std::ifstream &in,
   if (in.tellg() % report_frequency == 0)
     cerr << smithlab::toa(percent(in.tellg(), filesize)) << "%\r";
 }
+
 
 
 static void
@@ -123,25 +172,6 @@ load_regions(const string &regions_file,
     throw SMITHLABException("regions file not sorted: " + regions_file);
 }
 
-
-
-static bool
-region_precedes_site(const vector<GenomicRegion> &regions,
-                     const size_t region_idx, const MSite &s) {
-  return (region_idx < regions.size() &&
-          (regions[region_idx].get_chrom() < s.chrom ||
-           (regions[region_idx].get_chrom() == s.chrom &&
-            regions[region_idx].get_end() <= s.pos)));
-}
-
-static bool
-region_contains_site(const vector<GenomicRegion> &regions,
-                     const size_t region_idx, const MSite &s) {
-  // !!! ASSUMES REGION DOES NOT PRECEDE SITE
-  return (region_idx < regions.size() &&
-          regions[region_idx].get_chrom() == s.chrom &&
-          regions[region_idx].get_start() <= s.pos);
-}
 
 static bool
 site_allowed(const bool exclude_regions,
@@ -172,6 +202,7 @@ int main(int argc, const char **argv) {
     bool PROGRESS = false;
 
     bool nearest_neighbors = false;
+    bool not_span = false;
     bool exclude_regions = false;
 
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
@@ -185,6 +216,8 @@ int main(int argc, const char **argv) {
     opt_parse.add_opt("progress", 'P', "report progress", false, PROGRESS);
     opt_parse.add_opt("nearest", 'N', "use only nearest neighbors",
                       false , nearest_neighbors);
+    opt_parse.add_opt("notspan", 'S', "cancel corr spanning distinct regions",
+                      false , not_span);
     opt_parse.add_opt("reads", 'r', "min reads", false, min_reads);
     opt_parse.add_opt("regions", '\0', "regions file", false, regions_file);
     opt_parse.add_opt("exclude", 'E', "exclude regions (default include)",
@@ -233,25 +266,34 @@ int main(int argc, const char **argv) {
     if (!regions_file.empty())
       load_regions(regions_file, regions);
     size_t region_idx = 0;
+    size_t region_process_idx = 0;
 
     while (in >> s) {
       if (s.chrom != prev_chrom) {
         if (nearest_neighbors)
-          process_chrom_nearest(min_reads, max_dist, sites, x, y);
+          process_chrom_nearest(not_span, regions, region_process_idx,
+                                min_reads, max_dist, sites, x, y);
         else
-          process_chrom(min_reads, max_dist, sites, x, y);
+          process_chrom(not_span, regions, region_process_idx,
+                        min_reads, max_dist, sites, x, y);
         sites.clear();
       }
-      if (site_allowed(exclude_regions, regions, s, region_idx))
+
+      if (regions_file.empty() ||
+          site_allowed(exclude_regions, regions, s, region_idx))
         sites.push_back(s);
       prev_chrom.swap(s.chrom);
+      
       if (PROGRESS)
         report_progress_to_stderr(in, report_frequency, filesize);
     }
+
     if (nearest_neighbors)
-      process_chrom_nearest(min_reads, max_dist, sites, x, y);
+      process_chrom_nearest(not_span, regions, region_process_idx,
+                            min_reads, max_dist, sites, x, y);
     else
-      process_chrom(min_reads, max_dist, sites, x, y);
+      process_chrom(not_span, regions, region_process_idx,
+                    min_reads, max_dist, sites, x, y);
     if (PROGRESS) cerr << "100%" << endl;
 
     std::ofstream of;
