@@ -87,7 +87,8 @@ boundary_next_to_site(const vector<GenomicRegion> &regions,
   const bool contained = region_contains_site(regions, region_idx, s);
   if (contained) b = regions[region_idx].get_end();
   else
-    if (regions[region_idx].get_chrom() == s.chrom)
+    if (region_idx < regions.size() &&
+        regions[region_idx].get_chrom() == s.chrom)
       b = regions[region_idx].get_start();
     else b = std::numeric_limits<size_t>::max(); 
 
@@ -107,7 +108,7 @@ process_chrom(const bool not_span, const vector<GenomicRegion> &regions,
       size_t pos_limit = sites[i].pos + max_dist;
       if (not_span)
         pos_limit = std::min(pos_limit,
-            boundary_next_to_site(regions, region_idx, sites[i-1]));
+            boundary_next_to_site(regions, region_idx, sites[i]));
       size_t j = i + 1;
       while (j < sites.size() && sites[j].pos <= pos_limit) {
         if (sites[j].n_reads >= min_reads) {
@@ -294,6 +295,7 @@ int main(int argc, const char **argv) {
     else
       process_chrom(not_span, regions, region_process_idx,
                     min_reads, max_dist, sites, x, y);
+
     if (PROGRESS) cerr << "100%" << endl;
 
     std::ofstream of;
