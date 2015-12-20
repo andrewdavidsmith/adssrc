@@ -20,7 +20,7 @@ ifndef SMITHLAB_CPP
 $(error Must define SMITHLAB_CPP variable)
 endif
 
-PROGS = collapsebed countoverlaps
+PROGS = collapsebed countoverlaps autocorr
 
 SOURCES = $(wildcard *.cpp)
 INCLUDEDIRS = $(SMITHLAB_CPP)
@@ -71,6 +71,7 @@ smoothmeth: $(addprefix $(METHPIPE_ROOT)/src/common/, TwoStateHMM.o)
 
 reorder:    $(addprefix $(SMITHLAB_CPP)/, MappedRead.o)
 
+autocorr: $(addprefix $(METHPIPE_ROOT)/src/common/, MethpipeSite.o)
 # No rule to make object bsutils.o in Methpipe, so this won't compile.
 #majormethstate: $(addprefix $(METHPIPE_ROOT)/src/common/, bsutils.o)
 
