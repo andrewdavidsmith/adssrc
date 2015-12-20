@@ -36,6 +36,7 @@ using std::vector;
 using std::cout;
 using std::cerr;
 using std::endl;
+using std::tr1::unordered_map;
 
 struct Site {
   string chrom;
@@ -165,6 +166,8 @@ struct CountSet {
 
 double CountSet::alpha = 0.95;
 
+
+
 void
 CountSet::clear_counts(CountSet &cpg, CountSet &cpg_symm, CountSet &chh,
                        CountSet &cxg, CountSet &ccg, CountSet &all_c) {
@@ -179,13 +182,9 @@ CountSet::clear_counts(CountSet &cpg, CountSet &cpg_symm, CountSet &chh,
 
 
 static bool
-get_meth_unmeth(const bool IS_METHPIPE_FILE,
-                std::ifstream &in, Site &site) {
-  return (IS_METHPIPE_FILE ?
-          methpipe::read_site(in, site.chrom, site.pos, site.strand,
-                              site.context, site.meth, site.n_reads) :
-          methpipe::read_site_old(in, site.chrom, site.pos, site.strand,
-                                  site.context, site.meth, site.n_reads));
+get_meth_unmeth(std::ifstream &in, Site &site) {
+  return methpipe::read_site(in, site.chrom, site.pos, site.strand,
+                             site.context, site.meth, site.n_reads);
 }
 
 
@@ -210,6 +209,51 @@ write_interval(const string &chrom_name,
 }
 
 
+
+static bool
+bin_precedes_site(const string &chrom_name,
+                  const size_t end_pos, const Site &site) {
+  return chrom_name != site.chrom || end_pos <= site.pos;
+}
+
+
+
+static bool
+load_chrom_sizes(std::ifstream &in, vector<string> &chrom_names,
+                 vector<size_t> &chrom_sizes) {
+  string name;
+  size_t size = 0;
+  while (in >> name >> size) {
+    chrom_names.push_back(name);
+    chrom_sizes.push_back(size);
+  }
+  return true;
+}
+
+
+
+static void
+increment_bin(const size_t bin_size,
+              const vector<string> &chrom_names,
+              const vector<size_t> &chrom_sizes,
+              size_t &chrom_index,
+              string &chrom_name,
+              size_t &chrom_size,
+              size_t &start_pos) {
+
+  if (start_pos + bin_size < chrom_size)
+    start_pos += bin_size;
+
+  else {
+    start_pos = 0;
+    ++chrom_index;
+    chrom_size = chrom_sizes[chrom_index];
+    chrom_name = chrom_names[chrom_index];
+  }
+}
+
+
+
 int
 main(int argc, const char **argv) {
 
@@ -220,8 +264,8 @@ main(int argc, const char **argv) {
     string outfile;
 
     /****************** COMMAND LINE OPTIONS ********************/
-    OptionParser opt_parse(strip_path(argv[0]), "compute methylation levels",
-                           "<methcounts-file>");
+    OptionParser opt_parse(strip_path(argv[0]), "methylation levels in bins",
+                           "<chrom-sizes> <methcounts-file>");
     opt_parse.add_opt("output", 'o', "output file (default: stdout)",
                       false, outfile);
     opt_parse.add_opt("binsize", 'b', "size of bins",
@@ -244,17 +288,27 @@ main(int argc, const char **argv) {
       cerr << opt_parse.option_missing_message() << endl;
       return EXIT_SUCCESS;
     }
-    if (leftover_args.size() != 1) {
+    if (leftover_args.size() != 2) {
       cerr << opt_parse.help_message() << endl;
       return EXIT_SUCCESS;
     }
-    const string meth_file = leftover_args.front();
+    const string chrom_sizes_file = leftover_args.front();
+    const string meth_file = leftover_args.back();
     /****************** END COMMAND LINE OPTIONS *****************/
+
+    vector<string> chrom_names;
+    vector<size_t> chrom_sizes;
+    std::ifstream chrom_sizes_in(chrom_sizes_file.c_str());
+    if (!chrom_sizes_in ||
+        !load_chrom_sizes(chrom_sizes_in, chrom_names, chrom_sizes))
+      throw SMITHLABException("bad chrom sizes file: " + chrom_sizes_file);
+    size_t chrom_index = 0;
+    string chrom_name = chrom_names[chrom_index];
+    size_t chrom_size = chrom_sizes[chrom_index];
 
     std::ifstream in(meth_file.c_str());
     if (!in)
       throw SMITHLABException("bad input file: " + meth_file);
-    const bool IS_METHPIPE_FILE = methpipe::is_methpipe_file_single(meth_file);
 
     CountSet cpg, cpg_symm, chh, cxg, ccg, all_c;
     Site site, prev_site;
@@ -265,18 +319,16 @@ main(int argc, const char **argv) {
     if (!outfile.empty()) of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
-    string chrom_name;
-
-    while (get_meth_unmeth(IS_METHPIPE_FILE, in, site)) {
+    while (get_meth_unmeth(in, site)) {
 
       // need to make sure chrom variable has right chrom for printing
-
-      while (start_pos + bin_size < site.pos) {
-        if (chrom_name.empty())
-          prev_site.chrom = site.chrom;
-        write_interval(prev_site.chrom, start_pos, bin_size,
+      while (bin_precedes_site(chrom_name,
+                               start_pos + bin_size, site)) {
+        write_interval(chrom_name, start_pos, bin_size,
                        cpg, cpg_symm, chh, cxg, ccg, all_c, out);
-        start_pos += bin_size;
+
+        increment_bin(bin_size, chrom_names, chrom_sizes,
+                      chrom_index, chrom_name, chrom_size, start_pos);
         CountSet::clear_counts(cpg, cpg_symm, chh, cxg, ccg, all_c);
       }
 
