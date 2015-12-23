@@ -37,6 +37,8 @@ using std::cout;
 using std::cerr;
 using std::endl;
 using std::tr1::unordered_map;
+using std::pair;
+using std::make_pair;
 
 struct Site {
   string chrom;
@@ -219,20 +221,27 @@ bin_precedes_site(const string &chrom_name,
 
 
 static bool
-load_chrom_sizes(std::ifstream &in, vector<string> &chrom_names,
+load_chrom_sizes(std::ifstream &in,
+                 vector<string> &chrom_names,
                  vector<size_t> &chrom_sizes) {
   string name;
   size_t size = 0;
-  while (in >> name >> size) {
-    chrom_names.push_back(name);
-    chrom_sizes.push_back(size);
+  vector<pair<string, size_t> > ns;
+  while (in >> name >> size)
+    ns.push_back(make_pair(name, size));
+
+  sort(ns.begin(), ns.end());
+
+  for (size_t i = 0; i < ns.size(); ++i) {
+    chrom_names.push_back(ns[i].first);
+    chrom_sizes.push_back(ns[i].second);
   }
   return true;
 }
 
 
 
-static void
+static bool
 increment_bin(const size_t bin_size,
               const vector<string> &chrom_names,
               const vector<size_t> &chrom_sizes,
@@ -247,9 +256,12 @@ increment_bin(const size_t bin_size,
   else {
     start_pos = 0;
     ++chrom_index;
+    if (chrom_index >= chrom_sizes.size())
+      return false;
     chrom_size = chrom_sizes[chrom_index];
     chrom_name = chrom_names[chrom_index];
   }
+  return true;
 }
 
 
@@ -327,9 +339,9 @@ main(int argc, const char **argv) {
         write_interval(chrom_name, start_pos, bin_size,
                        cpg, cpg_symm, chh, cxg, ccg, all_c, out);
 
+        CountSet::clear_counts(cpg, cpg_symm, chh, cxg, ccg, all_c);
         increment_bin(bin_size, chrom_names, chrom_sizes,
                       chrom_index, chrom_name, chrom_size, start_pos);
-        CountSet::clear_counts(cpg, cpg_symm, chh, cxg, ccg, all_c);
       }
 
       if (site.chrom != prev_site.chrom)
@@ -357,6 +369,13 @@ main(int argc, const char **argv) {
       prev_site = site;
     }
 
+    do {
+      write_interval(chrom_name, start_pos, bin_size,
+                     cpg, cpg_symm, chh, cxg, ccg, all_c, out);
+      CountSet::clear_counts(cpg, cpg_symm, chh, cxg, ccg, all_c);
+    }
+    while (increment_bin(bin_size, chrom_names, chrom_sizes,
+                         chrom_index, chrom_name, chrom_size, start_pos));
   }
   catch (const SMITHLABException &e) {
     cerr << e.what() << endl;
