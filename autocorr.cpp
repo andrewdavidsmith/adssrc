@@ -74,7 +74,8 @@ region_contains_site(const vector<GenomicRegion> &regions,
   // !!! ASSUMES REGION DOES NOT PRECEDE SITE
   return (region_idx < regions.size() &&
           regions[region_idx].get_chrom() == s.chrom &&
-          regions[region_idx].get_start() <= s.pos);
+          regions[region_idx].get_start() <= s.pos &&
+          regions[region_idx].get_end() >= s.pos);
 }
 
 
@@ -101,7 +102,8 @@ process_chrom(const bool not_span, const vector<GenomicRegion> &regions,
               size_t &region_idx,
               const size_t min_reads, const size_t max_dist,
               const vector<MSite> &sites,
-              vector<vector<methType> > &a, vector<vector<methType> > &b) {
+              vector<vector<methType> > &a, vector<vector<methType> > &b,
+              const size_t step) {
   
   for (size_t i = 0; i < sites.size(); ++i) {
     if (sites[i].n_reads >= min_reads) {
@@ -109,14 +111,24 @@ process_chrom(const bool not_span, const vector<GenomicRegion> &regions,
       if (not_span)
         pos_limit = std::min(pos_limit,
             boundary_next_to_site(regions, region_idx, sites[i]));
-      size_t j = i + 1;
-      while (j < sites.size() && sites[j].pos <= pos_limit) {
-        if (sites[j].n_reads >= min_reads) {
-          const size_t dist = sites[j].pos - sites[i].pos;
-          a[dist].push_back(sites[i].meth);
-          b[dist].push_back(sites[j].meth);
+      if (step == 0) {
+        size_t j = i + 1;
+        while (j < sites.size() && sites[j].pos <= pos_limit) {
+          if (sites[j].n_reads >= min_reads) {
+            const size_t dist = sites[j].pos - sites[i].pos;
+            a[dist].push_back(sites[i].meth);
+            b[dist].push_back(sites[j].meth);
+          }
+          ++j;
         }
-        ++j;
+      } else {
+        size_t j = i + step;
+        if (j < sites.size() && sites[j].pos <= pos_limit &&
+            sites[j].n_reads >= min_reads) {
+            const size_t dist = sites[j].pos - sites[i].pos;
+            a[dist].push_back(sites[i].meth);
+            b[dist].push_back(sites[j].meth);
+        }
       }
     }
   }
@@ -196,6 +208,7 @@ int main(int argc, const char **argv) {
     size_t max_dist = 4000;
     size_t min_reads = 10;
     size_t min_sites = 500;
+    size_t step = 0;
 
     string regions_file;
 
@@ -217,6 +230,8 @@ int main(int argc, const char **argv) {
     opt_parse.add_opt("progress", 'P', "report progress", false, PROGRESS);
     opt_parse.add_opt("nearest", 'N', "use only nearest neighbors",
                       false , nearest_neighbors);
+    opt_parse.add_opt("n_neighbor", 'n', "use n-step neighbors",
+                      false , step);
     opt_parse.add_opt("notspan", 'S', "cancel corr spanning distinct regions",
                       false , not_span);
     opt_parse.add_opt("reads", 'r', "min reads", false, min_reads);
@@ -276,13 +291,14 @@ int main(int argc, const char **argv) {
                                 min_reads, max_dist, sites, x, y);
         else
           process_chrom(not_span, regions, region_process_idx,
-                        min_reads, max_dist, sites, x, y);
+                        min_reads, max_dist, sites, x, y, step);
         sites.clear();
       }
 
       if (regions_file.empty() ||
-          site_allowed(exclude_regions, regions, s, region_idx))
+          site_allowed(exclude_regions, regions, s, region_idx)) {
         sites.push_back(s);
+      }
       prev_chrom.swap(s.chrom);
       
       if (PROGRESS)
@@ -294,7 +310,7 @@ int main(int argc, const char **argv) {
                             min_reads, max_dist, sites, x, y);
     else
       process_chrom(not_span, regions, region_process_idx,
-                    min_reads, max_dist, sites, x, y);
+                    min_reads, max_dist, sites, x, y, step);
 
     if (PROGRESS) cerr << "100%" << endl;
 
@@ -305,7 +321,6 @@ int main(int argc, const char **argv) {
     for (size_t i = 1; i < x.size(); ++i)
       if (x[i].size() >= min_sites)
         out << i << '\t' << corr(x[i], y[i])  << '\t' << x[i].size() << endl;
-
   }
   catch (SMITHLABException &e) {
     cerr << "ERROR:\t" << e.what() << endl;
