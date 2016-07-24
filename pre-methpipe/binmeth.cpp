@@ -1,7 +1,7 @@
 /*    binmeth: a program to compute methylation levels in genomic bins
  *    (fixed width intervals that partition the genome).
  *
- *    Copyright (C) 2015  University of Southern California and
+ *    Copyright (C) 2016  University of Southern California and
  *                        Andrew D. Smith
  *
  *    Authors: Andrew D. Smith
@@ -22,12 +22,13 @@
 #include <iostream>
 #include <fstream>
 #include <numeric>
-#include <tr1/cmath>
+#include <cmath>
 
 #include "OptionParser.hpp"
 #include "smithlab_utils.hpp"
 #include "smithlab_os.hpp"
 #include "MethpipeFiles.hpp"
+#include "MethpipeSite.hpp"
 
 #include "bsutils.hpp"
 
@@ -36,60 +37,71 @@ using std::vector;
 using std::cout;
 using std::cerr;
 using std::endl;
-using std::tr1::unordered_map;
+// using std::unordered_map;
 using std::pair;
 using std::make_pair;
 
-struct Site {
-  string chrom;
-  size_t pos;
-  string strand;
-  string context;
-  double meth;
-  size_t n_reads;
 
-  size_t n_meth() const {return std::tr1::round(meth*n_reads);}
+// function used to ensure input sites are sorted
+static bool
+precedes(const MSite &prev, const MSite &curr) {
+  const int chrom_comp = prev.chrom.compare(curr.chrom);
+  return (chrom_comp < 0 ||
+          (chrom_comp == 0 && prev.pos < curr.pos));
+}
 
-  void add(const Site &other) {
-    if (!is_mutated() && other.is_mutated())
-      context += 'x';
-    // ADS: order matters below as n_reads update invalidates n_meth()
-    // function until meth has been updated
-    const size_t total_c_reads = n_meth() + other.n_meth();
-    n_reads += other.n_reads;
-    meth = static_cast<double>(total_c_reads)/n_reads;
+
+// aggregation of data related to bins; intended use as singleton
+struct BinInfo {
+
+  string chrom_name;
+  size_t chrom_size;
+  size_t start_pos;
+  size_t chrom_index;
+  size_t bin_size;
+
+  BinInfo(const size_t input_bin_size,
+          const vector<string> &chrom_names,
+          const vector<size_t> &chrom_sizes) {
+    bin_size = input_bin_size;
+    chrom_index = 0;
+    start_pos = 0;
+    chrom_name = chrom_names[chrom_index];
+    chrom_size = chrom_sizes[chrom_index];
   }
 
-  // ADS: function below has redundant check for is_cpg, which is
-  // expensive and might be ok to remove
-  bool is_mate_of(const Site &first) {
-    return (first.pos + 1 == pos && first.is_cpg() && is_cpg() &&
-            first.strand == "+" && strand == "-");
-  }
-  ////////////////////////////////////////////////////////////////////////
-  /////  Functions below test the type of site. These are CpG, CHH, and
-  /////  CHG divided into two kinds: CCG and CXG, the former including a
-  /////  CpG within. Also included is a function that tests if a site
-  /////  has a mutation.
-  /////  WARNING: None of these functions test for the length of their
-  /////  argument string, which could cause problems.
-  ////////////////////////////////////////////////////////////////////////
-  bool is_cpg() const {
-    return (context[0] == 'C' && context[1] == 'p' && context[2] == 'G');
-  }
-  bool is_chh() const {
-    return (context[0] == 'C' && context[1] == 'H' && context[2] == 'H');
-  }
-  bool is_ccg() const {
-    return (context[0] == 'C' && context[1] == 'C' && context[2] == 'G');
-  }
-  bool is_cxg() const {
-    return (context[0] == 'C' && context[1] == 'X' && context[2] == 'G');
-  }
-  bool is_mutated() const {
-    return context[3] == 'x';
-  }
+  bool
+  increment(const vector<string> &chrom_names,
+            const vector<size_t> &chrom_sizes);
 };
+
+
+bool
+BinInfo::increment(const vector<string> &chrom_names,
+                   const vector<size_t> &chrom_sizes) {
+
+  if (start_pos + bin_size < chrom_size)
+    start_pos += bin_size;
+
+  else {
+    start_pos = 0;
+    ++chrom_index;
+    if (chrom_index >= chrom_sizes.size())
+      return false;
+    chrom_size = chrom_sizes[chrom_index];
+    chrom_name = chrom_names[chrom_index];
+  }
+  return true;
+}
+
+
+static bool
+bin_precedes_site(BinInfo &bin, const MSite &site) {
+  const int chrom_comp = bin.chrom_name.compare(site.chrom);
+  return (chrom_comp < 0 ||
+          (chrom_comp == 0 &&
+           (bin.start_pos + bin.bin_size <= site.pos)));
+}
 
 
 struct CountSet {
@@ -109,7 +121,7 @@ struct CountSet {
   clear_counts(CountSet &cpg, CountSet &cpg_symm, CountSet &chh,
                CountSet &cxg, CountSet &ccg, CountSet &all_c);
 
-  void update(const Site &s) {
+  void update(const MSite &s) {
     if (s.is_mutated()) {
       ++mutations;
     }
@@ -169,7 +181,6 @@ struct CountSet {
 double CountSet::alpha = 0.95;
 
 
-
 void
 CountSet::clear_counts(CountSet &cpg, CountSet &cpg_symm, CountSet &chh,
                        CountSet &cxg, CountSet &ccg, CountSet &all_c) {
@@ -182,40 +193,31 @@ CountSet::clear_counts(CountSet &cpg, CountSet &cpg_symm, CountSet &chh,
 }
 
 
-
-static bool
-get_meth_unmeth(std::ifstream &in, Site &site) {
-  return methpipe::read_site(in, site.chrom, site.pos, site.strand,
-                             site.context, site.meth, site.n_reads);
-}
-
-
-
 static void
-write_interval(const string &chrom_name,
-               const size_t start_pos, const size_t bin_size,
-               const CountSet &cpg, const CountSet &cpg_symm,
-               const CountSet &chh, const CountSet &cxg,
-               const CountSet &ccg, const CountSet &all_c,
+write_interval(const bool PRINT_ADDITIONAL_LEVELS,
+               const BinInfo &bin,
+               const CountSet &cpg,
+               // const CountSet &cpg_symm,
+               // const CountSet &chh, const CountSet &cxg,
+               // const CountSet &ccg, const CountSet &all_c,
                std::ostream &out) {
 
-  out << chrom_name << '\t'
-      << start_pos << '\t'
-      << start_pos + bin_size << '\t'
+  out << bin.chrom_name << '\t'
+      << bin.start_pos << '\t'
+      << bin.start_pos + bin.bin_size << '\t'
       << cpg.total_sites << ':'
       << cpg.sites_covered << ':'
       << cpg.total_c << ':'
       << cpg.coverage() << '\t'
       << cpg.weighted_mean_meth() << '\t'
-      << '+' << endl;
-}
+      << '+';
 
+  if (PRINT_ADDITIONAL_LEVELS)
+    out << '\t'
+        << cpg.fractional_meth() << '\t'
+        << cpg.mean_meth();
 
-
-static bool
-bin_precedes_site(const string &chrom_name,
-                  const size_t end_pos, const Site &site) {
-  return chrom_name != site.chrom || end_pos <= site.pos;
+  out << '\n';
 }
 
 
@@ -240,30 +242,11 @@ load_chrom_sizes(std::ifstream &in,
 }
 
 
-
-static bool
-increment_bin(const size_t bin_size,
-              const vector<string> &chrom_names,
-              const vector<size_t> &chrom_sizes,
-              size_t &chrom_index,
-              string &chrom_name,
-              size_t &chrom_size,
-              size_t &start_pos) {
-
-  if (start_pos + bin_size < chrom_size)
-    start_pos += bin_size;
-
-  else {
-    start_pos = 0;
-    ++chrom_index;
-    if (chrom_index >= chrom_sizes.size())
-      return false;
-    chrom_size = chrom_sizes[chrom_index];
-    chrom_name = chrom_names[chrom_index];
-  }
-  return true;
+static std::istream &
+get_meth_unmeth(std::istream &in, MSite &site) {
+  return methpipe::read_site(in, site.chrom, site.pos, site.strand,
+                             site.context, site.meth, site.n_reads);
 }
-
 
 
 int
@@ -274,6 +257,7 @@ main(int argc, const char **argv) {
     bool VERBOSE = false;
     size_t bin_size = 1000;
     string outfile;
+    bool PRINT_ADDITIONAL_LEVELS = false;
 
     /****************** COMMAND LINE OPTIONS ********************/
     OptionParser opt_parse(strip_path(argv[0]), "methylation levels in bins",
@@ -284,6 +268,8 @@ main(int argc, const char **argv) {
                       false, bin_size);
     opt_parse.add_opt("alpha", 'a', "alpha for confidence interval",
                       false, CountSet::alpha);
+    opt_parse.add_opt("more-levels", 'M', "print more meth level information",
+                      false, PRINT_ADDITIONAL_LEVELS);
     opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -314,34 +300,35 @@ main(int argc, const char **argv) {
     if (!chrom_sizes_in ||
         !load_chrom_sizes(chrom_sizes_in, chrom_names, chrom_sizes))
       throw SMITHLABException("bad chrom sizes file: " + chrom_sizes_file);
-    size_t chrom_index = 0;
-    string chrom_name = chrom_names[chrom_index];
-    size_t chrom_size = chrom_sizes[chrom_index];
 
     std::ifstream in(meth_file.c_str());
     if (!in)
       throw SMITHLABException("bad input file: " + meth_file);
 
     CountSet cpg, cpg_symm, chh, cxg, ccg, all_c;
-    Site site, prev_site;
-
-    size_t start_pos = 0ul;
+    MSite site, prev_site;
 
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
+    // BinInfo (singleton) to keep track of the current chromosome
+    // while iterating over sites
+    BinInfo bin(bin_size, chrom_names, chrom_sizes);
+
+    // iterate over sites (lines in methcounts output file)
     while (get_meth_unmeth(in, site)) {
 
-      // need to make sure chrom variable has right chrom for printing
-      while (bin_precedes_site(chrom_name,
-                               start_pos + bin_size, site)) {
-        write_interval(chrom_name, start_pos, bin_size,
-                       cpg, cpg_symm, chh, cxg, ccg, all_c, out);
+      if (!precedes(prev_site, site))
+        throw SMITHLABException("sites not sorted in: " + meth_file);
 
+      // need to make sure curr_chrom_name variable has right chrom
+      // for printing
+      while (bin_precedes_site(bin, site)) {
+        write_interval(PRINT_ADDITIONAL_LEVELS,
+                       bin, cpg, out); //, cpg_symm, chh, cxg, ccg, all_c, out);
         CountSet::clear_counts(cpg, cpg_symm, chh, cxg, ccg, all_c);
-        increment_bin(bin_size, chrom_names, chrom_sizes,
-                      chrom_index, chrom_name, chrom_size, start_pos);
+        bin.increment(chrom_names, chrom_sizes);
       }
 
       if (site.chrom != prev_site.chrom)
@@ -355,12 +342,9 @@ main(int argc, const char **argv) {
           cpg_symm.update(site);
         }
       }
-      else if (site.is_chh())
-        chh.update(site);
-      else if (site.is_ccg())
-        ccg.update(site);
-      else if (site.is_cxg())
-        cxg.update(site);
+      else if (site.is_chh()) chh.update(site);
+      else if (site.is_ccg()) ccg.update(site);
+      else if (site.is_cxg()) cxg.update(site);
       else
         throw SMITHLABException("bad site context: " + site.context);
 
@@ -370,12 +354,11 @@ main(int argc, const char **argv) {
     }
 
     do {
-      write_interval(chrom_name, start_pos, bin_size,
-                     cpg, cpg_symm, chh, cxg, ccg, all_c, out);
+      write_interval(PRINT_ADDITIONAL_LEVELS,
+                     bin, cpg, out); //, cpg_symm, chh, cxg, ccg, all_c, out);
       CountSet::clear_counts(cpg, cpg_symm, chh, cxg, ccg, all_c);
     }
-    while (increment_bin(bin_size, chrom_names, chrom_sizes,
-                         chrom_index, chrom_name, chrom_size, start_pos));
+    while (bin.increment(chrom_names, chrom_sizes));
   }
   catch (const SMITHLABException &e) {
     cerr << e.what() << endl;
