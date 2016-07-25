@@ -20,7 +20,7 @@ ifndef SMITHLAB_CPP
 $(error Must define SMITHLAB_CPP variable)
 endif
 
-PROGS = 
+PROGS =
 
 SOURCES = $(wildcard *.cpp)
 INCLUDEDIRS = $(SMITHLAB_CPP)
@@ -33,23 +33,10 @@ endif
 
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
-CXX = g++
-CXXFLAGS = -Wall -Wextra -fmessage-length=50
+CXX = g++-6.1.0
+CXXFLAGS = -std=c++11 -Wall -Wextra -fmessage-length=72
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
-
-ifeq "$(shell uname)" "Darwin"
-CFLAGS += -arch x86_64
-endif
-
-# Flags passed to the C++ compiler.
-ifeq "$(shell uname)" "Darwin"
-CXXFLAGS += -arch x86_64
-ifeq "$(shell if [ `sysctl -n kern.osrelease | cut -d . -f 1` -ge 13 ];\
-              then echo 'true'; fi)" "true"
-CXXFLAGS += -stdlib=libstdc++
-endif
-endif
 
 ifdef DEBUG
 CXXFLAGS += $(DEBUGFLAGS)
