@@ -24,32 +24,19 @@ PROGS = collapsebed countoverlaps autocorr
 
 SOURCES = $(wildcard *.cpp)
 INCLUDEDIRS = $(SMITHLAB_CPP)
-LIBS = -lgsl -lgslcblas # -lefence
+LIBS = -lgsl -lgslcblas
 
 ifdef METHPIPE_ROOT
-PROGS += tsscpgplot smoothmeth reorder #majormethstate
+PROGS += tsscpgplot smoothmeth binmeth
 INCLUDEDIRS += $(METHPIPE_ROOT)/src/common
 endif
 
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
 CXX = g++
-CXXFLAGS = -Wall -Wextra -fmessage-length=50
+CXXFLAGS = -Wall -Wextra -fmessage-length=72 -std=c++11
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
-
-ifeq "$(shell uname)" "Darwin"
-CFLAGS += -arch x86_64
-endif
-
-# Flags passed to the C++ compiler.
-ifeq "$(shell uname)" "Darwin"
-CXXFLAGS += -arch x86_64
-ifeq "$(shell if [ `sysctl -n kern.osrelease | cut -d . -f 1` -ge 13 ];\
-              then echo 'true'; fi)" "true"
-CXXFLAGS += -stdlib=libstdc++
-endif
-endif
 
 ifdef DEBUG
 CXXFLAGS += $(DEBUGFLAGS)
@@ -72,6 +59,7 @@ smoothmeth: $(addprefix $(METHPIPE_ROOT)/src/common/, TwoStateHMM.o)
 reorder:    $(addprefix $(SMITHLAB_CPP)/, MappedRead.o)
 
 autocorr: $(addprefix $(METHPIPE_ROOT)/src/common/, MethpipeSite.o)
+
 # No rule to make object bsutils.o in Methpipe, so this won't compile.
 #majormethstate: $(addprefix $(METHPIPE_ROOT)/src/common/, bsutils.o)
 
