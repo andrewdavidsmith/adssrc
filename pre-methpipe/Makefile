@@ -20,7 +20,7 @@ ifndef SMITHLAB_CPP
 $(error Must define SMITHLAB_CPP variable)
 endif
 
-PROGS = 
+PROGS =
 
 SOURCES = $(wildcard *.cpp)
 INCLUDEDIRS = $(SMITHLAB_CPP)
@@ -34,7 +34,7 @@ endif
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
 CXX = g++
-CXXFLAGS = -std=c++11 -Wall -Wextra -fmessage-length=50
+CXXFLAGS = -std=c++11 -Wall -Wextra -fmessage-length=72
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
 
