@@ -20,14 +20,14 @@ ifndef SMITHLAB_CPP
 $(error Must define SMITHLAB_CPP variable)
 endif
 
-PROGS = collapsebed countoverlaps autocorr
+PROGS = collapsebed countoverlaps
 
 SOURCES = $(wildcard *.cpp)
 INCLUDEDIRS = $(SMITHLAB_CPP)
 LIBS = -lgsl -lgslcblas
 
 ifdef METHPIPE_ROOT
-PROGS += tsscpgplot smoothmeth binmeth
+PROGS += tsscpgplot smoothmeth binmeth autocorr
 INCLUDEDIRS += $(METHPIPE_ROOT)/src/common
 endif
 
