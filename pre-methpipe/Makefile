@@ -33,7 +33,7 @@ endif
 
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
-CXX = g++-6.1.0
+CXX = g++
 CXXFLAGS = -std=c++11 -Wall -Wextra -fmessage-length=72
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
