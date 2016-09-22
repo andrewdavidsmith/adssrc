@@ -21,7 +21,7 @@
  */
 
 #include <fstream>
-#include <tr1/cmath>
+#include <cmath>
 #include <numeric>
 
 #include "OptionParser.hpp"
@@ -90,7 +90,7 @@ boundary_next_to_site(const vector<GenomicRegion> &regions,
     if (region_idx < regions.size() &&
         regions[region_idx].get_chrom() == s.chrom)
       b = regions[region_idx].get_start();
-    else b = std::numeric_limits<size_t>::max(); 
+    else b = std::numeric_limits<size_t>::max();
 
   return b;
 }
@@ -102,7 +102,7 @@ process_chrom(const bool not_span, const vector<GenomicRegion> &regions,
               const size_t min_reads, const size_t max_dist,
               const vector<MSite> &sites,
               vector<vector<methType> > &a, vector<vector<methType> > &b) {
-  
+
   for (size_t i = 0; i < sites.size(); ++i) {
     if (sites[i].n_reads >= min_reads) {
       size_t pos_limit = sites[i].pos + max_dist;
@@ -284,7 +284,7 @@ int main(int argc, const char **argv) {
           site_allowed(exclude_regions, regions, s, region_idx))
         sites.push_back(s);
       prev_chrom.swap(s.chrom);
-      
+
       if (PROGRESS)
         report_progress_to_stderr(in, report_frequency, filesize);
     }
