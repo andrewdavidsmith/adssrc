@@ -20,14 +20,14 @@ ifndef SMITHLAB_CPP
 $(error Must define SMITHLAB_CPP variable)
 endif
 
-PROGS = 
+PROGS =
 
 SOURCES = $(wildcard *.cpp)
 INCLUDEDIRS = $(SMITHLAB_CPP)
 LIBS = -lgsl -lgslcblas # -lefence
 
 ifdef METHPIPE_ROOT
-PROGS += methcounts2 bsrate2 roimethstat2 hairpinreads binmeth levels2
+PROGS += methcounts2 bsrate2 roimethstat2 hairpinreads binmeth levels2 select-sites
 INCLUDEDIRS += $(METHPIPE_ROOT)/src/common
 endif
 
@@ -37,19 +37,6 @@ CXX = g++
 CXXFLAGS = -Wall -Wextra -fmessage-length=50
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
-
-ifeq "$(shell uname)" "Darwin"
-CFLAGS += -arch x86_64
-endif
-
-# Flags passed to the C++ compiler.
-ifeq "$(shell uname)" "Darwin"
-CXXFLAGS += -arch x86_64
-ifeq "$(shell if [ `sysctl -n kern.osrelease | cut -d . -f 1` -ge 13 ];\
-              then echo 'true'; fi)" "true"
-CXXFLAGS += -stdlib=libstdc++
-endif
-endif
 
 ifdef DEBUG
 CXXFLAGS += $(DEBUGFLAGS)
@@ -67,7 +54,10 @@ $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 roimethstat2 methcounts2 binmeth levels2: \
 	$(addprefix $(METHPIPE_ROOT)/src/common/, MethpipeFiles.o)
 
-bsrate2 methcounts2: $(addprefix $(SMITHLAB_CPP)/, MappedRead.o)
+select-sites: \
+	$(addprefix $(METHPIPE_ROOT)/src/common/, MethpipeSite.o)
+
+mapscores bsrate2 methcounts2: $(addprefix $(SMITHLAB_CPP)/, MappedRead.o)
 
 %.o: %.cpp %.hpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
