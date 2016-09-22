@@ -1,6 +1,6 @@
 /*    tsscpgplot: get data to plot methylation level around a TSS
  *
- *    Copyright (C) 2010-2014 Andrew D. Smith
+ *    Copyright (C) 2010-2016 Andrew D. Smith
  *
  *    Authors: Andrew D. Smith
  *
@@ -35,9 +35,9 @@ using std::cout;
 using std::pair;
 using std::make_pair;
 using std::sort;
-using std::tr1::unordered_map;
+using std::unordered_map;
 
-static size_t 
+static size_t
 get_reads(const GenomicRegion &cpg) {
   const string region_name(cpg.get_name());
   const size_t colon_offset = region_name.find(":");
@@ -51,27 +51,27 @@ process_chrom(const size_t region_size,
               const vector<GenomicRegion> &tss,
               vector<double> &totals,
               vector<size_t> &counts) {
-  
+
   for (size_t i = 0; i < tss.size(); ++i) {
-    
+
     GenomicRegion a(tss[i]);
     a.set_start(a.get_start() - region_size);
     a.set_end(a.get_start() + 1);
-          
+
     GenomicRegion b(tss[i]);
     b.set_end(b.get_end() + region_size);
     b.set_start(b.get_end() - 1);
-    
+
     const size_t left = a.get_start();
     const size_t right = left + 2*region_size;
     vector<GenomicRegion>::const_iterator start(find_closest(cpg, a));
     vector<GenomicRegion>::const_iterator end(find_closest(cpg, b));
-    
+
     if ((*start < tss[i]) && (tss[i] < *end)) {
-      
+
       const size_t idx = (start - cpg.begin());
       const size_t lim = (end - cpg.begin());
-            
+
       if (tss[i].pos_strand()) {
         for (size_t k = idx; k <= lim; ++k)
           if (cpg[k].get_start() >= left && cpg[k].get_start() < right) {
@@ -98,9 +98,10 @@ process_chrom(const size_t region_size,
 static void
 collapse_bins(const size_t bin_size, vector<double> &totals,
               vector<size_t> &counts) {
-  
-  const size_t n_bins = 
+
+  const size_t n_bins =
     std::ceil(static_cast<double>(totals.size())/bin_size);
+
   vector<double> t(n_bins, 0.0);
   vector<size_t> c(n_bins, 0ul);
   for (size_t i = 0; i < totals.size(); ++i) {
@@ -114,7 +115,7 @@ collapse_bins(const size_t bin_size, vector<double> &totals,
 
 
 static void
-extract_methpipe_format_cpg_region(const string &buffer, 
+extract_methpipe_format_cpg_region(const string &buffer,
                                    GenomicRegion &r) {
   std::istringstream is(buffer);
   string chrom, name;
@@ -129,23 +130,23 @@ extract_methpipe_format_cpg_region(const string &buffer,
 
 
 int main(int argc, const char **argv) {
-  
+
   try {
     /* FILES */
     string outfile;
     size_t region_size = 10000;
     bool VERBOSE = false;
     size_t bin_size = 50;
-    
+
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
     OptionParser opt_parse(strip_path(argv[0]), "", "<TSS_FILE> <CPG_FILE>");
-    opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
+    opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)",
                       false , outfile);
-    opt_parse.add_opt("size", 's', "region size", 
+    opt_parse.add_opt("size", 's', "region size",
                       false , region_size);
-    opt_parse.add_opt("bin", 'b', "bin size", 
+    opt_parse.add_opt("bin", 'b', "bin size",
                       false , bin_size);
-    opt_parse.add_opt("verbose", 'v', "print more run info", 
+    opt_parse.add_opt("verbose", 'v', "print more run info",
                       false , VERBOSE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -168,18 +169,18 @@ int main(int argc, const char **argv) {
     const string tss_file_name = leftover_args.front();
     const string cpg_file_name = leftover_args.back();
     /**********************************************************************/
-    
+
     if (VERBOSE)
       cerr << "loading tss data" << endl;
     vector<GenomicRegion> tss_all;
     ReadBEDFile(tss_file_name, tss_all);
     assert(check_sorted(tss_all));
-    
+
     if (VERBOSE)
       cerr << "loading cpg data" << endl;
     vector<GenomicRegion> cpg_all;
     if (methpipe::is_methpipe_file_single(cpg_file_name)) {
-      if (VERBOSE) 
+      if (VERBOSE)
         cerr << "format is methpipe" << endl;
       std::ifstream cpgin(cpg_file_name.c_str());
       if (!cpgin)
@@ -193,7 +194,7 @@ int main(int argc, const char **argv) {
       assert(check_sorted(cpg_all));
     }
     else {
-      if (VERBOSE) 
+      if (VERBOSE)
         cerr << "format is bed" << endl;
       std::ifstream cpgin(cpg_file_name.c_str());
       if (!cpgin)
@@ -205,22 +206,22 @@ int main(int argc, const char **argv) {
     }
     if (VERBOSE)
       cerr << "number of CpG sites: " << cpg_all.size() << endl;
-    
+
     vector<vector<GenomicRegion> > tss;
     separate_chromosomes(tss_all, tss);
-    
+
     vector<vector<GenomicRegion> > cpg;
     separate_chromosomes(cpg_all, cpg);
-    
+
     if (VERBOSE)
       cerr << "making cpg lookup table" << endl;
     unordered_map<string, size_t> cpg_lookup;
     for (size_t i = 0; i < cpg.size(); ++i)
       cpg_lookup[cpg[i].front().get_chrom()] = i;
-    
+
     vector<double> totals(2*region_size, 0.0);
     vector<size_t> counts(2*region_size, 0ul);
-    
+
     size_t total_tss = 0;
     for (size_t i = 0; i < tss.size(); ++i) {
       const unordered_map<string, size_t>::const_iterator j =
@@ -232,7 +233,7 @@ int main(int argc, const char **argv) {
     }
 
     collapse_bins(bin_size, totals, counts);
-    
+
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
@@ -243,11 +244,11 @@ int main(int argc, const char **argv) {
            << "fraction_of_tss" << '\t'
            << "fraction_of_counts" << '\t'
            << "counts" << endl;
-    
+
     for (size_t i = 0; i < totals.size(); ++i)
-      out << i << "\t" 
-          << counts[i]/double(total_tss) << "\t" 
-          << totals[i]/counts[i] << "\t" 
+      out << i << "\t"
+          << counts[i]/double(total_tss) << "\t"
+          << totals[i]/counts[i] << "\t"
           << counts[i] << endl;
   }
   catch (SMITHLABException &e) {
