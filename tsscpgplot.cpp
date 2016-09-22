@@ -47,17 +47,17 @@ get_reads(const GenomicRegion &cpg) {
 
 static void
 process_chrom(const size_t region_size,
-	      const vector<GenomicRegion> &cpg,
-	      const vector<GenomicRegion> &tss,
-	      vector<double> &totals,
-	      vector<size_t> &counts) {
-
+              const vector<GenomicRegion> &cpg,
+              const vector<GenomicRegion> &tss,
+              vector<double> &totals,
+              vector<size_t> &counts) {
+  
   for (size_t i = 0; i < tss.size(); ++i) {
     
     GenomicRegion a(tss[i]);
     a.set_start(a.get_start() - region_size);
     a.set_end(a.get_start() + 1);
-	  
+          
     GenomicRegion b(tss[i]);
     b.set_end(b.get_end() + region_size);
     b.set_start(b.get_end() - 1);
@@ -71,24 +71,24 @@ process_chrom(const size_t region_size,
       
       const size_t idx = (start - cpg.begin());
       const size_t lim = (end - cpg.begin());
-	    
+            
       if (tss[i].pos_strand()) {
-	for (size_t k = idx; k <= lim; ++k)
-	  if (cpg[k].get_start() >= left && cpg[k].get_start() < right) {
-	    const size_t base_idx = cpg[k].get_start() - left;
-	    const size_t reads = get_reads(cpg[k]);
-	    totals[base_idx] += cpg[k].get_score()*reads;
-	    counts[base_idx] += reads;
-	  }
+        for (size_t k = idx; k <= lim; ++k)
+          if (cpg[k].get_start() >= left && cpg[k].get_start() < right) {
+            const size_t base_idx = cpg[k].get_start() - left;
+            const size_t reads = get_reads(cpg[k]);
+            totals[base_idx] += cpg[k].get_score()*reads;
+            counts[base_idx] += reads;
+          }
       }
       else {
-	for (size_t k = idx; k <= lim; ++k)
-	  if (cpg[k].get_start() >= left && cpg[k].get_start() < right) {
-	    const size_t base_idx = right - 1 - cpg[k].get_start();
-	    const size_t reads = get_reads(cpg[k]);
-	    totals[base_idx] += cpg[k].get_score()*reads;
-	    counts[base_idx] += reads;
-	  }
+        for (size_t k = idx; k <= lim; ++k)
+          if (cpg[k].get_start() >= left && cpg[k].get_start() < right) {
+            const size_t base_idx = right - 1 - cpg[k].get_start();
+            const size_t reads = get_reads(cpg[k]);
+            totals[base_idx] += cpg[k].get_score()*reads;
+            counts[base_idx] += reads;
+          }
       }
     }
   }
@@ -97,7 +97,7 @@ process_chrom(const size_t region_size,
 
 static void
 collapse_bins(const size_t bin_size, vector<double> &totals,
-	      vector<size_t> &counts) {
+              vector<size_t> &counts) {
   
   const size_t n_bins = 
     std::ceil(static_cast<double>(totals.size())/bin_size);
@@ -115,7 +115,7 @@ collapse_bins(const size_t bin_size, vector<double> &totals,
 
 static void
 extract_methpipe_format_cpg_region(const string &buffer, 
-				   GenomicRegion &r) {
+                                   GenomicRegion &r) {
   std::istringstream is(buffer);
   string chrom, name;
   size_t pos = 0ul, coverage = 0ul;
@@ -123,7 +123,7 @@ extract_methpipe_format_cpg_region(const string &buffer,
   double meth_level;
   is >> chrom >> pos >> strand >> name >> meth_level >> coverage;
   r = GenomicRegion(chrom, pos, pos + 1, name + ":" + toa(coverage),
-		    meth_level, strand);
+                    meth_level, strand);
 }
 
 
@@ -140,13 +140,13 @@ int main(int argc, const char **argv) {
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
     OptionParser opt_parse(strip_path(argv[0]), "", "<TSS_FILE> <CPG_FILE>");
     opt_parse.add_opt("output", 'o', "Name of output file (default: stdout)", 
-		      false , outfile);
+                      false , outfile);
     opt_parse.add_opt("size", 's', "region size", 
-		      false , region_size);
+                      false , region_size);
     opt_parse.add_opt("bin", 'b', "bin size", 
-		      false , bin_size);
+                      false , bin_size);
     opt_parse.add_opt("verbose", 'v', "print more run info", 
-		      false , VERBOSE);
+                      false , VERBOSE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
@@ -180,27 +180,27 @@ int main(int argc, const char **argv) {
     vector<GenomicRegion> cpg_all;
     if (methpipe::is_methpipe_file_single(cpg_file_name)) {
       if (VERBOSE) 
-	cerr << "format is methpipe" << endl;
+        cerr << "format is methpipe" << endl;
       std::ifstream cpgin(cpg_file_name.c_str());
       if (!cpgin)
-	throw SMITHLABException("bad file: " + cpg_file_name);
+        throw SMITHLABException("bad file: " + cpg_file_name);
       GenomicRegion r;
       string buffer;
       while (getline(cpgin, buffer)) {
-	extract_methpipe_format_cpg_region(buffer, r);
-	cpg_all.push_back(r);
+        extract_methpipe_format_cpg_region(buffer, r);
+        cpg_all.push_back(r);
       }
       assert(check_sorted(cpg_all));
     }
     else {
       if (VERBOSE) 
-	cerr << "format is bed" << endl;
+        cerr << "format is bed" << endl;
       std::ifstream cpgin(cpg_file_name.c_str());
       if (!cpgin)
-	throw SMITHLABException("bad file: " + cpg_file_name);
+        throw SMITHLABException("bad file: " + cpg_file_name);
       GenomicRegion r;
       while (cpgin >> r)
-	cpg_all.push_back(r);
+        cpg_all.push_back(r);
       assert(check_sorted(cpg_all));
     }
     if (VERBOSE)
@@ -224,10 +224,10 @@ int main(int argc, const char **argv) {
     size_t total_tss = 0;
     for (size_t i = 0; i < tss.size(); ++i) {
       const unordered_map<string, size_t>::const_iterator j =
-	cpg_lookup.find(tss[i][0].get_chrom());
+        cpg_lookup.find(tss[i][0].get_chrom());
       if (j != cpg_lookup.end()) {
-	total_tss += tss[i].size();
-	process_chrom(region_size, cpg[j->second], tss[i], totals, counts);
+        total_tss += tss[i].size();
+        process_chrom(region_size, cpg[j->second], tss[i], totals, counts);
       }
     }
 
@@ -239,16 +239,16 @@ int main(int argc, const char **argv) {
 
     if (VERBOSE)
       cerr << "format: "
-	   << "position" << '\t'
-	   << "fraction_of_tss" << '\t'
-	   << "fraction_of_counts" << '\t'
-	   << "counts" << endl;
+           << "position" << '\t'
+           << "fraction_of_tss" << '\t'
+           << "fraction_of_counts" << '\t'
+           << "counts" << endl;
     
     for (size_t i = 0; i < totals.size(); ++i)
       out << i << "\t" 
-	  << counts[i]/double(total_tss) << "\t" 
-	  << totals[i]/counts[i] << "\t" 
-	  << counts[i] << endl;
+          << counts[i]/double(total_tss) << "\t" 
+          << totals[i]/counts[i] << "\t" 
+          << counts[i] << endl;
   }
   catch (SMITHLABException &e) {
     cerr << "ERROR:\t" << e.what() << endl;
