@@ -1,7 +1,4 @@
-/*  select-sites: get all sites from methcounts output in (or outside)
- *  a set of BED intervals
- *
- *  Copyright (C) 2016 University of Southern California
+/*  Copyright (C) 2016 University of Southern California
  *                     Andrew D. Smith
  *
  *  Authors: Andrew D. Smith
@@ -102,8 +99,8 @@ find_start_line(const string &chr, const size_t idx, std::istream &in) {
 
 
 static void
-process_interval(std::istream &in,
-                 const GenomicRegion &region, std::ostream &out) {
+process_region(std::istream &in,
+               const GenomicRegion &region, std::ostream &out) {
 
   const string chrom(region.get_chrom());
   const size_t start_pos = region.get_start();
@@ -173,7 +170,7 @@ main(int argc, const char **argv) {
       throw SMITHLABException("bad sites file: " + sites_file);
 
     for (size_t i = 0; i < regions.size(); ++i)
-      process_interval(in, regions[i], out);
+      process_region(in, regions[i], out);
 
   }
   catch (const SMITHLABException &e) {
