@@ -27,7 +27,7 @@
 #include <algorithm>
 #include <numeric>
 #include <sstream>
-#include <tr1/unordered_set>
+#include <unordered_set>
 
 #include <cctype> // for isspace
 
@@ -43,7 +43,7 @@ using std::vector;
 using std::endl;
 using std::cerr;
 using std::cout;
-using std::tr1::unordered_set;
+using std::unordered_set;
 using std::istream_iterator;
 
 

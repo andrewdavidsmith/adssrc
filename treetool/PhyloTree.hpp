@@ -55,7 +55,7 @@
 
 #include <string>
 #include <vector>
-#include <tr1/unordered_set>
+#include <unordered_set>
 
 
 class PhyloTree {
@@ -69,7 +69,7 @@ public:
 
   static void
   copy_subtree_with_species(const PhyloTree &t, 
-			    const std::tr1::unordered_set<std::string> &species,
+			    const std::unordered_set<std::string> &species,
 			    PhyloTree &u);
   
 protected:
@@ -88,7 +88,7 @@ protected:
     
     static void
     copy_subtree_with_species(const PTNode &t, 
-			      const std::tr1::unordered_set<std::string> 
+			      const std::unordered_set<std::string> 
 			      &species,
 			      PTNode &u);
     
