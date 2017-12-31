@@ -33,7 +33,7 @@
   (A:0.1,B:0.2,(C:0.3,D:0.4):0.5);       distances and leaf names (popular)
   (A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;     distances and all names
   ((B:0.2,(C:0.3,D:0.4)E:0.5)F:0.1)A;    a tree rooted on a leaf node (rare)
-  
+
   ========================================================================
 
   (1) It seems like a tree always ends in a semicolon
@@ -45,9 +45,9 @@
   (6) There is a question of whether to allow commas or colons inside
       names, for example by using quotes around the names or trying to
       parse intelligently
-  (7) Leaves should have proper names as unique identifiers, if not given in the 
-      newick string, we should name them properly. 
-  (8) Search for nearest common ancestor will return the ancestor's name, for now. 
+  (7) Leaves should have proper names as unique identifiers, if not given in the
+      newick string, we should name them properly.
+  (8) Search for nearest common ancestor will return the ancestor's name, for now.
 */
 
 #ifndef PHYLOTREE_HPP
@@ -68,35 +68,35 @@ public:
   std::string Newick_format() const {return root.Newick_format() + ";";}
 
   static void
-  copy_subtree_with_species(const PhyloTree &t, 
-			    const std::unordered_set<std::string> &species,
-			    PhyloTree &u);
-  
+  copy_subtree_with_species(const PhyloTree &t,
+                            const std::unordered_set<std::string> &species,
+                            PhyloTree &u);
+
 protected:
-  
+
   struct PTNode {
     PTNode() {}
     PTNode(const std::string &subtree_string);
     void swap(PTNode &other);
-    
+
     bool has_children() const {return !child.empty();}
     bool is_leaf() const {return child.empty();}
     size_t get_size() const;
 
     std::string tostring(const size_t depth = 0) const;
     std::string Newick_format() const;
-    
+
     static void
-    copy_subtree_with_species(const PTNode &t, 
-			      const std::unordered_set<std::string> 
-			      &species,
-			      PTNode &u);
-    
+    copy_subtree_with_species(const PTNode &t,
+                              const std::unordered_set<std::string>
+                              &species,
+                              PTNode &u);
+
     std::vector<PTNode> child;
     std::string name;
     double branch_length; // distance to parent
   };
-  
+
   PTNode root;
 };
 
