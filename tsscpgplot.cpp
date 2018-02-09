@@ -19,7 +19,7 @@
  */
 
 #include <fstream>
-
+#include <unordered_map>
 #include "OptionParser.hpp"
 #include "smithlab_utils.hpp"
 #include "smithlab_os.hpp"
