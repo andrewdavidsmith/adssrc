@@ -50,7 +50,8 @@ process_chrom(const size_t region_size,
               const vector<GenomicRegion> &cpg,
               const vector<GenomicRegion> &tss,
               vector<double> &totals,
-              vector<size_t> &counts) {
+              vector<size_t> &counts,
+              vector<size_t> &density) {
 
   for (size_t i = 0; i < tss.size(); ++i) {
 
@@ -79,6 +80,7 @@ process_chrom(const size_t region_size,
             const size_t reads = get_reads(cpg[k]);
             totals[base_idx] += cpg[k].get_score()*reads;
             counts[base_idx] += reads;
+            density[base_idx] += 1;
           }
       }
       else {
@@ -88,6 +90,7 @@ process_chrom(const size_t region_size,
             const size_t reads = get_reads(cpg[k]);
             totals[base_idx] += cpg[k].get_score()*reads;
             counts[base_idx] += reads;
+            density[base_idx] += 1;
           }
       }
     }
@@ -97,19 +100,22 @@ process_chrom(const size_t region_size,
 
 static void
 collapse_bins(const size_t bin_size, vector<double> &totals,
-              vector<size_t> &counts) {
+              vector<size_t> &counts, vector<size_t> &density) {
 
   const size_t n_bins =
     std::ceil(static_cast<double>(totals.size())/bin_size);
 
   vector<double> t(n_bins, 0.0);
   vector<size_t> c(n_bins, 0ul);
+  vector<size_t> d(n_bins,0ul);
   for (size_t i = 0; i < totals.size(); ++i) {
     t[i/bin_size] += totals[i];
     c[i/bin_size] += counts[i];
+    d[i/bin_size] += density[i];
   }
   totals.swap(t);
   counts.swap(c);
+  density.swap(d);
 }
 
 
@@ -221,6 +227,7 @@ int main(int argc, const char **argv) {
 
     vector<double> totals(2*region_size, 0.0);
     vector<size_t> counts(2*region_size, 0ul);
+    vector<size_t> density(2*region_size,0ul);
 
     size_t total_tss = 0;
     for (size_t i = 0; i < tss.size(); ++i) {
@@ -228,11 +235,11 @@ int main(int argc, const char **argv) {
         cpg_lookup.find(tss[i][0].get_chrom());
       if (j != cpg_lookup.end()) {
         total_tss += tss[i].size();
-        process_chrom(region_size, cpg[j->second], tss[i], totals, counts);
+        process_chrom(region_size, cpg[j->second], tss[i], totals, counts, density);
       }
     }
 
-    collapse_bins(bin_size, totals, counts);
+    collapse_bins(bin_size, totals, counts, density);
 
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());
@@ -243,13 +250,15 @@ int main(int argc, const char **argv) {
            << "position" << '\t'
            << "fraction_of_tss" << '\t'
            << "fraction_of_counts" << '\t'
-           << "counts" << endl;
+           << "mean count per region" << '\t' 
+           << "mean density per region" << endl;
 
     for (size_t i = 0; i < totals.size(); ++i)
       out << i << "\t"
           << counts[i]/double(total_tss) << "\t"
           << totals[i]/counts[i] << "\t"
-          << counts[i] << endl;
+          << counts[i]/double(total_tss) << "\t"
+          << density[i]/double(total_tss) << endl;
   }
   catch (SMITHLABException &e) {
     cerr << "ERROR:\t" << e.what() << endl;
