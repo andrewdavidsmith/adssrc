@@ -1,19 +1,25 @@
-/*    expand_chains: expand chains to intervals
+/* Copyright (C) 2017 University of Southern California and
+ *                    Andrew D. Smith
  *
- *    Copyright (C) 2017 University of Southern California and
- *                       Andrew D. Smith
+ * Authors: Andrew D. Smith
  *
- *    Authors: Andrew D. Smith
+ * expand_chains: expand chains to intervals. The chains should be
+ * in available from the UCSC Genome Browser downloads and in a
+ * directory called liftOver for a particular species. The names
+ * should look like mm10ToHg19.over.chain.gz. An example can be
+ * found here:
  *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation, either version 3 of the License, or
- *    (at your option) any later version.
+ * http://hgdownload.soe.ucsc.edu/goldenPath/mm10/liftOver/mm10ToHg19.over.chain.gz
  *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <string>
@@ -22,8 +28,8 @@
 #include <vector>
 #include <iostream>
 #include <cstdlib>
-#include <stdexcept>
 #include <algorithm>
+#include <exception>
 
 #include "smithlab_utils.hpp"
 #include "smithlab_os.hpp"
@@ -37,22 +43,6 @@ using std::cout;
 using std::cerr;
 using std::endl;
 
-struct site {
-  string chrom;
-  size_t position;
-  double data;
-};
-
-std::ostream &
-operator<<(std::ostream &os, const site &s) {
-  return os << s.chrom << '\t' << s.position << '\t' << s.data;
-}
-
-std::istream &
-operator>>(std::istream &in, site &s) {
-  in >> s.chrom >> s.position >> s.data;
-  return in;
-}
 
 struct aln_dat {
   size_t size; /* the size of the ungapped alignment */
@@ -131,7 +121,9 @@ operator>>(std::istream &is, chain_head &ch) {
   is >> ch.qStart;
   is >> ch.qEnd;
   is >> ch.id;
+
   char should_end_line = is.get(); // warnings... I know...
+
   return is;
 };
 
@@ -142,10 +134,10 @@ struct chain {
 
 std::ostream &
 operator<<(std::ostream &os, const chain &c) {
-  size_t ref_position = c.head.tStart;
-  size_t query_position = c.head.qStart;
   const string ref_chrom(c.head.tName);
   const string query_chrom(c.head.qName);
+  size_t ref_position = c.head.tStart;
+  size_t query_position = c.head.qStart;
   if (c.head.qStrand == '+') {
     for (size_t i = 0; i < c.alns.size(); ++i) {
       os << ref_chrom << '\t'
@@ -155,8 +147,8 @@ operator<<(std::ostream &os, const chain &c) {
          << query_position << '\t'
          << query_position + c.alns[i].size << '\t'
          << '+' << endl;
-      ref_position += c.alns[i].size + c.alns[i].dt;
-      query_position += c.alns[i].size + c.alns[i].dq;
+      ref_position += (c.alns[i].size + c.alns[i].dt);
+      query_position += (c.alns[i].size + c.alns[i].dq);
     }
   }
   else {
@@ -169,8 +161,8 @@ operator<<(std::ostream &os, const chain &c) {
          << (query_chrom_size - (query_position + c.alns[i].size)) << '\t'
          << (query_chrom_size - query_position) << '\t'
          << '-' << endl;
-      ref_position += c.alns[i].size + c.alns[i].dt;
-      query_position += c.alns[i].size + c.alns[i].dq;
+      ref_position += (c.alns[i].size + c.alns[i].dt);
+      query_position += (c.alns[i].size + c.alns[i].dq);
     }
   }
   return os;
@@ -244,7 +236,7 @@ main(int argc, const char **argv) {
       out << the_chains[i];
 
   }
-  catch (const SMITHLABException &e) {
+  catch (const std::runtime_error &e) {
     cerr << e.what() << endl;
     return EXIT_FAILURE;
   }
