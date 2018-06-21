@@ -42,7 +42,7 @@ using std::vector;
 using std::cout;
 using std::cerr;
 using std::endl;
-
+using std::runtime_error;
 
 struct aln_dat {
   size_t size; /* the size of the ungapped alignment */
@@ -217,26 +217,21 @@ main(int argc, const char **argv) {
     const string outfile(leftover_args.back());
     /****************** END COMMAND LINE OPTIONS *****************/
 
-    if (VERBOSE)
-      cerr << "[reading input chains]" << endl;
-    vector<chain> the_chains;
-    chain tmp_chain;
-    std::ifstream in_chains(chain_file.c_str());
-    while (in_chains >> tmp_chain)
-      the_chains.push_back(tmp_chain);
-
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());
     std::ostream out(outfile.empty() ? cout.rdbuf() : of.rdbuf());
+    if (!out)
+      throw runtime_error("cannot open output file: " + outfile);
 
-    if (VERBOSE)
-      cerr << "[writing expanded chains]" << endl;
+    chain tmp_chain;
+    std::ifstream in_chains(chain_file.c_str());
+    if (!in_chains)
+      throw runtime_error("cannot open input file: " + chain_file);
 
-    for (size_t i = 0; i < the_chains.size(); ++i)
-      out << the_chains[i];
-
+    while (in_chains >> tmp_chain)
+      out << tmp_chain;
   }
-  catch (const std::runtime_error &e) {
+  catch (const runtime_error &e) {
     cerr << e.what() << endl;
     return EXIT_FAILURE;
   }
