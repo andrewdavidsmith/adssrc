@@ -187,8 +187,10 @@ main(int argc, const char **argv) {
       cerr << "[total blocks = " << n_blocks << "]" << endl;
 
     if (VERBOSE)
-      cerr << "[sorting input blocks]" << endl;
-    sort(the_blocks.begin(), the_blocks.end());
+      cerr << "[checking input blocks are sorted]" << endl;
+    for (size_t i = 1; i < the_blocks.size(); ++i)
+      if (the_blocks[i] < the_blocks[i-1])
+        throw std::runtime_error("blocks not sorted in: " + chain_file);
 
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());
