@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <exception>
 #include <algorithm>
+#include <sstream>
 
 #include "smithlab_utils.hpp"
 #include "smithlab_os.hpp"
@@ -36,17 +37,24 @@ using std::vector;
 using std::cout;
 using std::cerr;
 using std::endl;
+using std::swap;
+using std::runtime_error;
 
 struct site {
   string chrom;
   size_t start;
   size_t end;
   double data;
+
   bool operator<(const site &other) const {
-    return chrom < other.chrom ||
-      (chrom == other.chrom && start < other.start);
+    return chrom < other.chrom || (chrom == other.chrom && start < other.start);
   }
 };
+
+inline bool
+can_be_merged(const site &a, const site &b) {
+  return a.data == b.data && a.end == b.start;
+}
 
 std::ostream &
 operator<<(std::ostream &os, const site &s) {
@@ -57,8 +65,7 @@ operator<<(std::ostream &os, const site &s) {
 
 std::istream &
 operator>>(std::istream &in, site &s) {
-  in >> s.chrom >> s.start >> s.end >> s.data;
-  return in;
+  return in >> s.chrom >> s.start >> s.end >> s.data;
 }
 
 struct block {
@@ -77,29 +84,23 @@ operator<<(std::ostream &os, const block &b) {
 }
 
 std::istream &
-operator>>(std::istream &is, block &b) {
+operator>>(std::istream &in, block &b) {
 
-  string tmp_chrom;
-  is >> tmp_chrom;
-  b.ref.set_chrom(tmp_chrom);
+  string r_chrom;
+  size_t r_start = 0, r_end = 0;
 
-  size_t tmp_pos;
-  is >> tmp_pos;
-  b.ref.set_start(tmp_pos);
-  is >> tmp_pos;
-  b.ref.set_end(tmp_pos);
+  string q_chrom;
+  size_t q_start = 0, q_end = 0;
+  char q_strand;
 
-  is >> tmp_chrom;
-  b.query.set_chrom(tmp_chrom);
-
-  is >> tmp_pos;
-  b.query.set_start(tmp_pos);
-  is >> tmp_pos;
-  b.query.set_end(tmp_pos);
-
-  is >> b.query_strand;
-
-  return is;
+  if (in
+      >> r_chrom >> r_start >> r_end
+      >> q_chrom >> q_start >> q_end >> q_strand) {
+    b.ref = SimpleGenomicRegion(r_chrom, r_start, r_end);
+    b.query = SimpleGenomicRegion(q_chrom, q_start, q_end);
+    b.query_strand = q_strand;
+  }
+  return in;
 }
 
 static bool
@@ -109,18 +110,11 @@ precedes(const block &b, const site &s) {
            b.ref.get_end() <= s.start));
 }
 
-// static bool
-// overlaps(const block &b, const site &s) {
-//   return b.ref.get_chrom() == s.chrom &&
-//     b.ref.get_start() <= s.position &&
-//     s.position < b.ref.get_end();
-// }
-
 static bool
 contains(const block &b, const site &s) {
   return b.ref.get_chrom() == s.chrom &&
     b.ref.get_start() <= s.start &&
-    s.start <= b.ref.get_end();
+    s.start < b.ref.get_end();
 }
 
 static void
@@ -130,13 +124,15 @@ lift_site(const block &b, const site &orig, site &lifted) {
   lifted.data = orig.data;
   if (b.query_strand == '+')
     lifted.start = b.query.get_start() + diff;
-  else lifted.start = b.query.get_end() - diff - 1;
+  else
+    lifted.start = b.query.get_end() - diff - 1;
   lifted.end = lifted.start;
 }
 
 int
 main(int argc, const char **argv) {
   try{
+
     string outfile;
     string fails_file;
 
@@ -151,7 +147,6 @@ main(int argc, const char **argv) {
                       false, fails_file);
     opt_parse.add_opt("verbose", 'v', "(optional) Print more information",
                       false, VERBOSE);
-
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
@@ -179,9 +174,8 @@ main(int argc, const char **argv) {
     vector<block> the_blocks;
     block tmp_block;
     std::ifstream in_blocks(chain_file.c_str());
-    while (in_blocks >> tmp_block) {
+    while (in_blocks >> tmp_block)
       the_blocks.push_back(tmp_block);
-    }
     const size_t n_blocks = the_blocks.size();
     if (VERBOSE)
       cerr << "[total blocks = " << n_blocks << "]" << endl;
@@ -206,27 +200,32 @@ main(int argc, const char **argv) {
     std::ifstream in_sites(sites_file.c_str());
 
     size_t curr_block = 0;
+
+    site prev_site;
     site tmp_site;
 
     size_t lines_processed = 0;
+    vector<site> to_merge;
     while (in_sites >> tmp_site) {
+      if (tmp_site < prev_site)
+        throw runtime_error("sites not sorted in: " + sites_file);
+
       ++lines_processed;
 
       const size_t w = tmp_site.end - tmp_site.start;
       site work(tmp_site);
       work.end = work.start;
 
-      vector<site> to_merge;
+      to_merge.clear();
+      to_merge.reserve(w);
       for (size_t i = 0; i < w; ++i) {
 
         // find relevant block
-        while (curr_block < n_blocks &&
-               precedes(the_blocks[curr_block], work))
+        while (curr_block < n_blocks && precedes(the_blocks[curr_block], work))
           ++curr_block;
 
-        if (curr_block < n_blocks &&
-            contains(the_blocks[curr_block], work)) {
-          // the site is contained in the block
+        if (curr_block < n_blocks && contains(the_blocks[curr_block], work)) {
+          // ok, working site is contained in this block
           site lifted;
           lift_site(the_blocks[curr_block], work, lifted);
           to_merge.push_back(lifted);
@@ -234,28 +233,31 @@ main(int argc, const char **argv) {
         work.start++;
         work.end++;
       }
-      if (to_merge.empty()) {
-        if (!fails_file.empty())
-          fails << tmp_site << endl;
-      }
+      if (to_merge.empty() && !fails_file.empty())
+        fails << tmp_site << endl;
       else {
+
         sort(to_merge.begin(), to_merge.end());
+
         size_t j = 0;
         to_merge[j].end++;
         for (size_t i = 1; i < to_merge.size(); ++i) {
-          if (to_merge[i].data == to_merge[j].data &&
-              to_merge[i].start == to_merge[j].end)
+          if (can_be_merged(to_merge[i], to_merge[i]))
             to_merge[j].end++;
           else {
             ++j;
             to_merge[j] = to_merge[i];
-            to_merge[j].end++;
+            to_merge[j].end++; // ensure non-zero size intervals
           }
         }
-        to_merge.erase(to_merge.begin() + j, to_merge.end());
+
+        // erase just after "j" because the j-th is good
+        to_merge.erase(to_merge.begin() + j + 1, to_merge.end());
+        // iterate including the "j" because j-th is good
         for (size_t i = 0; i <= j; ++i)
           out << to_merge[i] << endl;
       }
+      swap(prev_site, tmp_site);
     }
     if (VERBOSE)
       cerr << "[lines processed = " << lines_processed << "]" << endl;
