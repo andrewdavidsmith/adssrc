@@ -29,6 +29,89 @@ using std::vector;
 using std::endl;
 using std::cerr;
 
+struct end_point_score {
+  end_point_score(const string c, const size_t s, const bool isf,
+            const double sc) :
+    chr(c), start(s), count(1), total(sc), is_first(isf) {}
+  bool operator<(const end_point_score &other) const {
+    return (chr < other.chr ||
+            (chr == other.chr &&
+             (start < other.start ||
+              (start == other.start &&
+               is_first < other.is_first))));
+  }
+  string chr;
+  size_t start;
+  size_t count;
+  double total;
+  bool is_first;
+};
+
+static end_point_score
+first_end_point_score(const GenomicRegion &r) {
+  return end_point_score(r.get_chrom(), r.get_start(), true, r.get_score());
+}
+
+static end_point_score
+second_end_point_score(const GenomicRegion &r) {
+  return end_point_score(r.get_chrom(), r.get_end(), false, r.get_score());
+}
+
+static bool
+equal_end_points_score(const end_point_score &a, const end_point_score &b) {
+  return a.chr == b.chr && a.start == b.start && a.is_first == b.is_first;
+}
+
+
+static void
+collapse_end_points(vector<end_point_score> &ep) {
+  size_t j = 0;
+  for (size_t i = 1; i < ep.size(); ++i) {
+    if (equal_end_points_score(ep[i], ep[j])) {
+      ep[j].count++;
+      ep[j].total += ep[i].total;
+    }
+    else ep[++j] = ep[i];
+  }
+  ep.erase(ep.begin() + j + 1, ep.end());
+}
+
+
+
+static void
+collapse_bed(const size_t cutoff, vector<end_point_score> &end_points,
+             vector<GenomicRegion> &collapsed) {
+
+  collapse_end_points(end_points);
+
+  size_t count = 0;
+  double total = 0.0;
+  GenomicRegion region;
+  for (size_t i = 0; i < end_points.size() - 1; ++i) {
+    if (end_points[i].is_first) {
+      count += end_points[i].count;
+      total += end_points[i].total;
+    }
+    else {
+      count -= end_points[i].count;
+      total -= end_points[i].total;
+    }
+    if (count >= cutoff) {
+      region.set_chrom(end_points[i].chr);
+      region.set_start(end_points[i].start);
+      region.set_end(end_points[i + 1].start);
+      region.set_score(total/count);
+      collapsed.push_back(region);
+    }
+  }
+}
+
+
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+
+
 struct end_point {
   end_point(const string c, const size_t s, const bool isf) :
     chr(c), start(s), count(1), is_first(isf) {}
@@ -133,6 +216,8 @@ main(int argc, const char **argv) {
     bool FRAGMENTS = false;
     size_t cutoff = 1;
 
+    bool AVERAGE_SCORES = false;
+
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
     OptionParser opt_parse(strip_path(argv[0]), "", "<interval-files>");
     opt_parse.add_opt("output", 'o', "output file (default: stdout)",
@@ -141,6 +226,8 @@ main(int argc, const char **argv) {
                       false , FRAGMENTS);
     opt_parse.add_opt("cutoff", 'c', "report intervals covered this many times",
                       false , cutoff);
+    opt_parse.add_opt("average", 'a', "average scores (implies -f)",
+                      false, AVERAGE_SCORES);
     // opt_parse.add_opt("verbose", 'v', "print more run info",
     //                false , VERBOSE);
     vector<string> leftover_args;
@@ -164,25 +251,44 @@ main(int argc, const char **argv) {
     const vector<string> interval_files(leftover_args);
     /**********************************************************************/
 
-    vector<end_point> end_points;
-    for (size_t i = 0; i < interval_files.size(); ++i) {
-      if (VERBOSE)
-        cerr << interval_files[i] << endl;
-      vector<GenomicRegion> intervals;
-      ReadBEDFile(interval_files[i], intervals);
-      for (size_t j = 0; j < intervals.size(); ++j) {
-        end_points.push_back(first_end_point(intervals[j]));
-        end_points.push_back(second_end_point(intervals[j]));
-      }
-    }
-    sort(end_points.begin(), end_points.end());
-
     vector<GenomicRegion> collapsed;
+    if (AVERAGE_SCORES) {
 
-    if (FRAGMENTS)
+      vector<end_point_score> end_points;
+      for (size_t i = 0; i < interval_files.size(); ++i) {
+        if (VERBOSE)
+          cerr << interval_files[i] << endl;
+        vector<GenomicRegion> intervals;
+        ReadBEDFile(interval_files[i], intervals);
+        for (size_t j = 0; j < intervals.size(); ++j) {
+          end_points.push_back(first_end_point_score(intervals[j]));
+          end_points.push_back(second_end_point_score(intervals[j]));
+        }
+      }
+      sort(end_points.begin(), end_points.end());
+
       collapse_bed(cutoff, end_points, collapsed);
-    else
-      collapse_bed_merged(cutoff, end_points, collapsed);
+    }
+    else {
+
+      vector<end_point> end_points;
+      for (size_t i = 0; i < interval_files.size(); ++i) {
+        if (VERBOSE)
+          cerr << interval_files[i] << endl;
+        vector<GenomicRegion> intervals;
+        ReadBEDFile(interval_files[i], intervals);
+        for (size_t j = 0; j < intervals.size(); ++j) {
+          end_points.push_back(first_end_point(intervals[j]));
+          end_points.push_back(second_end_point(intervals[j]));
+        }
+      }
+      sort(end_points.begin(), end_points.end());
+
+      if (FRAGMENTS)
+        collapse_bed(cutoff, end_points, collapsed);
+      else
+        collapse_bed_merged(cutoff, end_points, collapsed);
+    }
 
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile.c_str());

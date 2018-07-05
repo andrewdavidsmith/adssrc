@@ -48,29 +48,29 @@ using std::istream_iterator;
 
 
 
-int 
+int
 main(int argc, const char **argv) {
-  
+
   try {
-    
+
     bool VERBOSE = false;
     string outfile;
     string species_file;
-    
+
     /****************** COMMAND LINE OPTIONS ********************/
-    OptionParser opt_parse(strip_path(argv[0]), 
-			   "manipulate Newick format phylogenetic trees",
-			   "<newick-input>");
-    opt_parse.add_opt("output", 'o', "output file (default: stdout)", 
-		      false, outfile);
+    OptionParser opt_parse(strip_path(argv[0]),
+         "manipulate Newick format phylogenetic trees",
+         "<newick-input>");
+    opt_parse.add_opt("output", 'o', "output file (default: stdout)",
+          false, outfile);
     opt_parse.add_opt("species", 's', "species defining subtree to extract",
-		      false, species_file);
+          false, species_file);
     opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
     if (argc == 1 || opt_parse.help_requested()) {
       cerr << opt_parse.help_message() << endl
-	   << opt_parse.about_message() << endl;
+     << opt_parse.about_message() << endl;
       return EXIT_SUCCESS;
     }
     if (opt_parse.about_requested()) {
@@ -87,31 +87,32 @@ main(int argc, const char **argv) {
     }
     const string newick_file = leftover_args.front();
     /****************** END COMMAND LINE OPTIONS *****************/
-    
+
     std::ifstream in(newick_file.c_str());
     if (!in)
       throw SMITHLABException("problem reading file: " + newick_file);
-    
+
     string nw;
     getline(in, nw);
 
     PhyloTree t(nw);
     cout << "tree format valid" << endl;
     cout << "number of nodes: " << t.get_size() << endl;
-    
+
     if (!species_file.empty()) {
       std::ifstream spec_in(species_file.c_str());
-      unordered_set<string> species((istream_iterator<string>(spec_in)), 
-				    istream_iterator<string>());
+      unordered_set<string> species((istream_iterator<string>(spec_in)),
+            istream_iterator<string>());
 
       PhyloTree u;
       PhyloTree::copy_subtree_with_species(t, species, u);
-      
+
       std::ofstream of;
       if (!outfile.empty()) of.open(outfile.c_str());
       std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
       out << u << endl;
     }
+    cout << t.tostring() << endl;
   }
   catch (const SMITHLABException &e) {
     cerr << e.what() << endl;
