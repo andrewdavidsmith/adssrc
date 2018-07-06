@@ -20,7 +20,8 @@ ifndef SMITHLAB_CPP
 $(error Must define SMITHLAB_CPP variable)
 endif
 
-PROGS = collapsebed countoverlaps base_liftover bedgraph_liftover expand_chains
+PROGS = collapsebed countoverlaps base_liftover bedgraph_liftover expand_chains \
+	adjust_intervals collapse_bedgraph
 
 SOURCES = $(wildcard *.cpp)
 INCLUDEDIRS = $(SMITHLAB_CPP)
