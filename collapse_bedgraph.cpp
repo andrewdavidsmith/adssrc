@@ -32,6 +32,8 @@ using std::endl;
 using std::cerr;
 using std::runtime_error;
 
+#include <parallel/algorithm>
+
 struct BedGraphInterval {
   string chr;
   size_t start;
@@ -218,3 +220,4 @@ main(int argc, const char **argv) {
   }
   return EXIT_SUCCESS;
 }
+`
