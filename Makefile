@@ -50,6 +50,9 @@ endif
 
 all: $(PROGS)
 
+chain_file_utils.o: chain_file_utils.cpp chain_file_utils.hpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDEARGS)
+
 $(PROGS): $(addprefix $(SMITHLAB_CPP)/, GenomicRegion.o smithlab_os.o \
 	smithlab_utils.o OptionParser.o)
 
@@ -61,6 +64,8 @@ smoothmeth: $(addprefix $(METHPIPE_ROOT)/src/common/, TwoStateHMM.o)
 reorder:    $(addprefix $(SMITHLAB_CPP)/, MappedRead.o)
 
 autocorr: $(addprefix $(METHPIPE_ROOT)/src/common/, MethpipeSite.o)
+
+expand_chains: chain_file_utils.o
 
 # No rule to make object bsutils.o in Methpipe, so this won't compile.
 #majormethstate: $(addprefix $(METHPIPE_ROOT)/src/common/, bsutils.o)
