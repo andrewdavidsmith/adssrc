@@ -22,7 +22,7 @@ endif
 
 PROGS = collapsebed countoverlaps baseliftover bedgraph_liftover expand_chains \
 	adjust_intervals collapse_bedgraph dataframe-euclidean-dist varyingrows \
-	readliftover collapse3col
+	readliftover collapse3col transpose_data_frame
 
 SOURCES = $(wildcard *.cpp)
 INCLUDEDIRS = $(SMITHLAB_CPP)
