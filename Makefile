@@ -22,11 +22,11 @@ endif
 
 PROGS = collapsebed countoverlaps baseliftover bedgraph_liftover expand_chains \
 	adjust_intervals collapse_bedgraph dataframe-euclidean-dist varyingrows \
-	readliftover collapse3col transpose_data_frame
+	readliftover collapse3col transpose_data_frame range_search
 
 SOURCES = $(wildcard *.cpp)
 INCLUDEDIRS = $(SMITHLAB_CPP)
-LIBS = -lgsl -lgslcblas
+## LIBS = -lgsl -lgslcblas
 
 ifdef METHPIPE_ROOT
 PROGS += tsscpgplot smoothmeth binmeth autocorr
