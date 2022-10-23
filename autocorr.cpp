@@ -21,10 +21,8 @@
 
 #include <fstream>
 #include <numeric>
-#include <random>
 
 #include "OptionParser.hpp"
-#include "GenomicRegion.hpp"
 #include "smithlab_utils.hpp"
 #include "smithlab_os.hpp"
 #include "MSite.hpp"
@@ -33,66 +31,51 @@ using std::string;
 using std::vector;
 using std::endl;
 using std::cerr;
-using std::cout;
-using std::sort;
-using std::inner_product;
 using std::runtime_error;
+using std::end;
+using std::begin;
+
+struct genomic_interval {
+  string chrom;
+  size_t start_pos;
+  size_t end_pos;
+  bool operator<(const genomic_interval &other) const {
+    const int x = chrom.compare(other.chrom);
+    return (x < 0 ||
+            (x == 0 &&
+             (start_pos < other.start_pos ||
+              (start_pos == other.start_pos &&
+               (end_pos < other.end_pos)))));
+  }
+};
 
 
-template <class T>
-static double
-corr(const vector<T> &X, const vector<T> &Y, T &sdX, T &sdY, T &covXY) {
-  // calculate Pearson correlation coefficient of two vectors X and Y
-
-  auto X_beg = begin(X);
-  auto X_end = end(X);
-  auto Y_beg = begin(Y);
-  auto Y_end = end(Y);
-
-  const T N = X.size(); // length of vectors X and Y (hope they are equal...)
-
-  const T X_mean = accumulate(X_beg, X_end, 0.0)/N; // mean(X)
-  const T Y_mean = accumulate(Y_beg, Y_end, 0.0)/N; // mean(Y)
-
-  const T ip = inner_product(X_beg, X_end, Y_beg, 0.0); // X.Y
-
-  const T X_ss = inner_product(X_beg, X_end, X_beg, 0.0); // Sum of sequares X
-  const T Y_ss = inner_product(Y_beg, Y_end, Y_beg, 0.0); // Sum of sequares Y
-
-  // sqrt of coveriance;
-  // Sum XY - N.mu(X).mu(Y)
-  covXY = ip - N*X_mean*Y_mean;
-
-  // sqrt[SSX - N.mu(X).mu(X)]
-  sdX = std::sqrt(X_ss - N*X_mean*X_mean);
-  // sqrt[SSY - N.mu(Y).mu(Y)]
-  sdY = std::sqrt(Y_ss - N*Y_mean*Y_mean);
-
-  // Pearson correlation
-  const double rXY = covXY/(sdX * sdY);
-
-  const double size_factor = 1.0/std::sqrt(N - 1.0);
-  sdX *= size_factor;
-  sdY *= size_factor;
-
-  return rXY;
+std::istream &
+operator>>(std::istream &in, genomic_interval &gi) {
+  string line;
+  if (getline(in, line)) {
+    std::istringstream iss(line);
+    if (!(iss >> gi.chrom >> gi.start_pos >> gi.end_pos))
+      in.setstate(std::ios_base::failbit);
+  }
+  return in;
 }
 
 
 static bool
-region_precedes_site(const SimpleGenomicRegion &region, const MSite &site) {
+region_precedes_site(const genomic_interval &region, const MSite &site) {
   // check if the region precedes a the site; [a, b) doesn't contain x
-  return (region.get_chrom() < site.chrom ||
-          (region.get_chrom() == site.chrom && region.get_end() <= site.pos));
+  const int x = region.chrom.compare(site.chrom);
+  return x < 0 || (x == 0 && region.end_pos <= site.pos);
 }
 
 
 static bool
-region_contains_site(const SimpleGenomicRegion region, const MSite &site) {
+region_contains_site(const genomic_interval region, const MSite &site) {
   // check if a given site is contained in a given region location
   // Containment is for half open intervals [a, b)
-  return (region.get_chrom() == site.chrom &&
-          region.get_start() <= site.pos && site.pos < region.get_end());
+  return (region.chrom == site.chrom &&
+          region.start_pos <= site.pos && site.pos < region.end_pos);
 }
 
 
@@ -100,7 +83,7 @@ region_contains_site(const SimpleGenomicRegion region, const MSite &site) {
 // bases) to the right of the current site; **assume the region
 // contains the site**. Index of the region is updated.
 static size_t
-boundary_position(const vector<SimpleGenomicRegion> &regions,
+boundary_position(const vector<genomic_interval> &regions,
                   size_t &idx, const MSite &site) {
   // move index of regions so the region doesn't entirely precede it
   while (idx < regions.size() && region_precedes_site(regions[idx], site))
@@ -111,125 +94,60 @@ boundary_position(const vector<SimpleGenomicRegion> &regions,
     // the right side (closed interval) of containing region; need to
     // return the site that is within the region, since it will be
     // used to know when to stop, and that must be inclusive
-    return regions[idx].get_end()-1;
+    return regions[idx].end_pos - 1;
   // by default return a very far boundary position
-  else return std::numeric_limits<size_t>::max();
-
+  return std::numeric_limits<size_t>::max();
 }
 
 
 static bool
 strands_are_good(const int strand, const MSite &a, const MSite &b) {
-  return ((strand == 0) ||
-          (strand == 1 && a.strand == b.strand) ||
-          (strand == -1 && a.strand != b.strand));
+  return strand == 0 ||
+    (strand == 1 && a.strand == b.strand) ||
+    (strand == -1 && a.strand != b.strand);
 }
 
 
-static std::pair<size_t, size_t>
-get_window_endpoint_bins(const size_t window_size, const size_t the_distance,
-                         const size_t max_distance) {
-  return std::make_pair(
-    (the_distance - window_size) > 1 ? (the_distance - window_size) : 1,
-    ((the_distance + window_size) < max_distance ?
-     (the_distance + window_size) : max_distance)
-                        );
-}
+struct sum_stats {
+  size_t N;      // counts
+  double X, Y;   // sums
+  double XY;     // cross product
+  double XX, YY; // sums of squares
 
-
-static void
-process_chrom(const bool require_same_region,
-              const vector<SimpleGenomicRegion> &regions,
-              size_t &region_idx,
-              const size_t min_reads, const size_t max_dist,
-              const size_t window_size, const vector<MSite> &sites,
-              const size_t the_neighbor, const int strand,
-              vector<vector<double> > &X, vector<vector<double> > &Y) {
-
-  // assign CpGs in the given vector to the distance tables a & b;
-  // each row corresponds to a gap distance in bp
-  for (size_t i = 0; i < sites.size(); ++i) {
-    // check if current site is covered by enough reads
-    if (sites[i].n_reads >= min_reads) {
-
-      // determine the limit of sites to consider
-      size_t position_limit = sites[i].pos + max_dist;
-      if (require_same_region)
-        position_limit =
-          std::min(position_limit,
-                   boundary_position(regions, region_idx, sites[i]));
-
-      if (the_neighbor == 0) { // use any neighbor in range
-        size_t j = i + 1; // start with 1st neighbor
-        for (; j < sites.size() && sites[j].pos <= position_limit; ++j)
-
-          // check other site has enough reads and right orientation
-          if (sites[j].n_reads >= min_reads &&
-              strands_are_good(strand, sites[i], sites[j])) {
-
-            // get the distance between current site and neighbor.
-            // This seems directional, assuming j is beyond i, but the
-            // opposite direction is included in the same bins at a
-            // different iteration on i
-            const size_t curr_dist = sites[j].pos - sites[i].pos;
-
-            // get range of posns current sites should contribute to
-            const std::pair<size_t, size_t> wb =
-              get_window_endpoint_bins(window_size, curr_dist, max_dist);
-
-            // include data for current sites in each relevant bin
-            for (size_t d = wb.first; d <= wb.second; ++d) {
-              X[d].push_back(sites[i].meth);
-              Y[d].push_back(sites[j].meth);
-            }
-          }
-      }
-      else {
-        size_t offset = i + the_neighbor; // use specified neighbor
-        // make sure other site is within range
-        if (offset < sites.size() && sites[offset].pos <= position_limit)
-
-          // check if other site has enough reads
-          if (sites[offset].n_reads >= min_reads &&
-              strands_are_good(strand, sites[i], sites[offset])) {
-
-            // as above: distance between current site and neighbor
-            const size_t curr_dist = sites[offset].pos - sites[i].pos;
-
-            // get range of posns current sites should contribute to
-            const std::pair<size_t, size_t> wb =
-              get_window_endpoint_bins(window_size, curr_dist, max_dist);
-
-            // include data for current sites in each relevant bin
-            for (size_t d = wb.first; d <= wb.second; ++d) {
-              X[d].push_back(sites[i].meth);
-              Y[d].push_back(sites[offset].meth);
-            }
-          }
-      }
-    }
+  void
+  update(const double x, const double y) {
+    ++N;
+    X += x;
+    Y += y;
+    XY += x*y;
+    XX += x*x;
+    YY += y*y;
   }
-}
 
+  double
+  get_values(double &sdX, double &sdY, double &covXY) const {
 
-static void
-load_regions(const string &regions_file, vector<SimpleGenomicRegion> &regions) {
-  // load genomic intervals (regions)
-  std::ifstream in(regions_file);
-  if (!in)
-    throw std::runtime_error("bad regions file: " + regions_file);
+    // Sum XY - N.mu(X).mu(Y) = Sum XY - Sum(X)Sum(Y)/N
+    covXY = XY - (X*Y)/N;
+    // sqrt[SSX - N.mu(X).mu(X)]
+    sdX = std::sqrt(XX - (X*X)/N);
+    // sqrt[SSY - N.mu(Y).mu(Y)]
+    sdY = std::sqrt(YY - (Y*Y)/N);
 
-  SimpleGenomicRegion r;
-  while (in >> r)
-    regions.push_back(r);
+    // Pearson correlation
+    const double rXY = covXY/(sdX*sdY);
 
-  if (!is_sorted(begin(regions), end(regions)))
-    throw std::runtime_error("regions file not sorted: " + regions_file);
-}
+    const double size_factor = 1.0/std::sqrt(N - 1.0);
+    sdX *= size_factor;
+    sdY *= size_factor;
+
+    return rXY;
+  }
+};
 
 
 static bool
-site_allowed(const vector<SimpleGenomicRegion> &regions,
+site_allowed(const vector<genomic_interval> &regions,
              const MSite &site, size_t &idx) {
   // check if a site is allowed to be used for correlation calculation
   // depending on whether you want to exlude or include certain regions
@@ -240,28 +158,194 @@ site_allowed(const vector<SimpleGenomicRegion> &regions,
 
 
 static void
-report_values(const string &valfile, const size_t num_val,
-              const vector<vector<double> > &x,
-              const vector<vector<double> > &y) {
-  std::ofstream out_val(valfile);
-  if (!out_val)
-    throw runtime_error("cannot open values output file: " + valfile);
+process_chrom(const bool require_same_region,
+              const vector<genomic_interval> &regions,
+              size_t &region_idx, // region_idx changes along chrom
+              const size_t min_reads, const size_t max_dist,
+              const size_t window_size, const vector<MSite> &sites,
+              const int strand, vector<sum_stats> &the_stats) {
 
-  std::random_device rd;
-  std::mt19937 generator(rd());
-  for (size_t i = 1; i < x.size(); ++i)
-    if (!x[i].empty()) {
-      vector<size_t> idx(x[i].size());
-      std::iota(begin(idx), end(idx), 0);
-      shuffle(begin(idx), end(idx), generator);
-      idx.resize(std::min(idx.size(), num_val));
-      // ADS: below likely not needed
-      sort(begin(idx), end(idx));
-      out_val << i;
-      for (size_t j = 0; j < idx.size(); j++)
-        out_val << '\t' << x[i][idx[j]] << '\t' << y[i][idx[j]];
-      out_val << endl;
+  // early exit if there are not enough sites
+  if (sites.size() <= 1)
+    return;
+
+  // assign CpGs in the given vector to the distance tables a & b;
+  // each row corresponds to a gap distance in bp
+  const auto j_lim = end(sites);
+  const auto i_lim = j_lim - 1;
+  for (auto i = begin(sites); i != i_lim; ++i) {
+
+    // check if current site is covered by enough reads
+    if (i->n_reads >= min_reads) {
+
+      // determine the limit of sites to consider
+      size_t position_limit = i->pos + max_dist;
+      if (require_same_region)
+        position_limit =
+          std::min(position_limit,
+                   boundary_position(regions, region_idx, *i));
+
+      // start j at the 1st neighbor
+      for (auto j = i + 1; j != j_lim && j->pos <= position_limit; ++j) {
+
+        // check other site has enough reads and right orientation
+        if (j->n_reads >= min_reads && strands_are_good(strand, *i, *j)) {
+
+          // get range of posns current sites should contribute to
+          const size_t the_dist = j->pos - i->pos;
+          size_t d = (the_dist > window_size) ? the_dist - window_size : 1;
+          const size_t d_lim = std::min(the_dist + window_size, max_dist);
+
+          // include data for current sites in each relevant bin
+          while (d <= d_lim)
+            the_stats[d++].update(i->meth, j->meth);
+        }
+      }
     }
+  }
+}
+
+
+static void
+process_sites_all_neighbors(const bool report_progress,
+                            const string &filename,
+                            const bool require_same_region,
+                            const vector<genomic_interval> &regions,
+                            const size_t min_reads, const size_t max_dist,
+                            const size_t window_size, const int strand,
+                            vector<sum_stats> &the_stats) {
+
+  std::ifstream in(filename);
+  if (!in)
+    throw std::runtime_error("bad input file: " + filename);
+
+  vector<MSite> sites;
+  MSite the_site;
+  string prev_chrom;
+
+  size_t region_idx_add = 0;
+  size_t region_idx_process = 0;
+
+  while (in >> the_site) {
+    if (the_site.chrom != prev_chrom) {
+      process_chrom(require_same_region, regions, region_idx_process,
+                    min_reads, max_dist, window_size, sites, strand, the_stats);
+      if (report_progress)
+        cerr << "processing: " << the_site.chrom << endl;
+      sites.clear();
+    }
+    if (regions.empty() || site_allowed(regions, the_site, region_idx_add))
+      sites.push_back(the_site);
+    prev_chrom = std::move(the_site.chrom);
+  }
+  process_chrom(require_same_region, regions, region_idx_process,
+                min_reads, max_dist, window_size, sites, strand, the_stats);
+}
+
+
+static void
+process_chrom_kth(const bool require_same_region,
+                  const vector<genomic_interval> &regions,
+                  size_t &region_idx, // region_idx changes along chrom
+                  const size_t min_reads, const size_t max_dist,
+                  const size_t window_size, const vector<MSite> &sites,
+                  const int strand, const size_t the_neighbor,
+                  vector<sum_stats> &the_stats) {
+
+  // early exit if there are not enough sites for specified neighbor
+  if (sites.size() <= the_neighbor)
+    return;
+
+  // limit of outer iteration to allow for k-th neighbors
+  const auto j_lim = end(sites);
+  const auto i_lim = j_lim - the_neighbor - 1;
+
+  // iterate over "left" site to get all pairs
+  for (auto i = begin(sites); i != i_lim; ++i) {
+
+    // check if current site is covered by enough reads
+    if (i->n_reads >= min_reads) {
+
+      // determine the limit of "right" sites to consider
+      size_t position_limit = i->pos + max_dist;
+      if (require_same_region)
+        position_limit =
+          std::min(position_limit,
+                   boundary_position(regions, region_idx, *i));
+
+      const auto j = i + the_neighbor; // get "right" neighbor site
+      // make sure right neighbor is in range
+      if (j != j_lim && j->pos <= position_limit) {
+
+        // check if other site has enough reads
+        if (j->n_reads >= min_reads && strands_are_good(strand, *i, *j)) {
+
+          // get range of posns current sites should contribute to
+          const size_t the_dist = j->pos - i->pos;
+          size_t d = (the_dist > window_size) ? the_dist - window_size : 1;
+          const size_t d_lim = std::min(the_dist + window_size, max_dist);
+          while (d <= d_lim)
+            the_stats[d++].update(i->meth, j->meth);
+        }
+      }
+    }
+  }
+}
+
+
+static void
+process_sites_kth_neighbor(const bool report_progress,
+                           const string &filename,
+                           const bool require_same_region,
+                           const vector<genomic_interval> &regions,
+                           const size_t min_reads, const size_t max_dist,
+                           const size_t window_size, const int strand,
+                           const size_t the_neighbor,
+                           vector<sum_stats> &the_stats) {
+
+  std::ifstream in(filename);
+  if (!in)
+    throw std::runtime_error("bad input file: " + filename);
+
+  vector<MSite> sites;
+  MSite the_site;
+  string prev_chrom;
+
+  size_t region_idx_add = 0;
+  size_t region_idx_process = 0;
+
+  while (in >> the_site) {
+    if (the_site.chrom != prev_chrom) {
+      process_chrom_kth(require_same_region, regions, region_idx_process,
+                        min_reads, max_dist, window_size, sites,
+                        strand, the_neighbor, the_stats);
+      if (report_progress)
+        cerr << "processing: " << the_site.chrom << endl;
+      sites.clear();
+    }
+    if (regions.empty() || site_allowed(regions, the_site, region_idx_add))
+      sites.push_back(the_site);
+    prev_chrom = std::move(the_site.chrom);
+  }
+  process_chrom_kth(require_same_region, regions, region_idx_process,
+                    min_reads, max_dist, window_size, sites,
+                    strand, the_neighbor, the_stats);
+}
+
+
+static void
+load_regions(const string &regions_file, vector<genomic_interval> &regions) {
+  // load genomic intervals (regions)
+  std::ifstream in(regions_file);
+  if (!in)
+    throw std::runtime_error("bad regions file: " + regions_file);
+
+  genomic_interval r;
+  while (in >> r)
+    regions.push_back(r);
+
+  if (!is_sorted(begin(regions), end(regions)))
+    throw std::runtime_error("regions file not sorted: " + regions_file);
 }
 
 
@@ -273,10 +357,10 @@ int main(int argc, const char **argv) {
 
 This program computes statistics on the autocorrelation of methylation
 levels. The input file must be in "counts" format from dnmtools. The
-output file has the format of one line per distance between
-sites. These distances begin with 2 since we assume CpG sites. Each
-line has the follwing values: distance, correlation, N, sdX, sdY,
-covXY. Typically only the first two of those are of interest.
+output file has one line for each distance between sites. Sites are
+assumed to be CpG sites, but need not be. Each line of output has the
+follwing values: distance, correlation, N, sdX, sdY, covXY. The value
+of N is the number of observations contributing.
 
   )""";
 
@@ -288,18 +372,15 @@ covXY. Typically only the first two of those are of interest.
     size_t window_size = 0;
     int strand = 0; // code: same=1, different=-1 and any=0
 
-    string valfile; // report vals for debug here
-    size_t num_val = 1000; // report vals for debug, how many?
-
     string regions_file;
 
-    bool VERBOSE = false;
-    bool PROGRESS = false;
+    bool verbose = false;
+    bool report_progress = false;
 
     bool require_same_region = false;
 
     /****************** GET COMMAND LINE ARGUMENTS ***************************/
-    OptionParser opt_parse(strip_path(argv[0]), description, "<meth-file>");
+    OptionParser opt_parse(strip_path(argv[0]), description, "<counts-file>");
     opt_parse.add_opt("output", 'o', "name of output file (default: stdout)",
                       false , outfile);
     opt_parse.add_opt("max-dist", 'd', "maximum distance for pairs of sites",
@@ -319,14 +400,10 @@ covXY. Typically only the first two of those are of interest.
                       "(bed format)", false, regions_file);
     opt_parse.add_opt("same-region", 'S', "require both sites in same region",
                       false , require_same_region);
-    opt_parse.add_opt("valout", '\0', "write values in this file "
-                      "(default: none)",
-                      false , valfile);
-    opt_parse.add_opt("report-n-vals", '\0', "number of values to output",
-                      false , num_val);
-    opt_parse.add_opt("progress", 'P', "report progress", false, PROGRESS);
+    opt_parse.add_opt("progress", 'P', "report progress", false,
+                      report_progress);
     opt_parse.add_opt("verbose", 'v', "print more run info",
-                      false , VERBOSE);
+                      false , verbose);
     opt_parse.set_show_defaults();
     vector<string> leftover_args;
     opt_parse.parse(argc, argv, leftover_args);
@@ -352,70 +429,46 @@ covXY. Typically only the first two of those are of interest.
 
     const size_t input_filesize = get_filesize(input_filename);
 
-    if (VERBOSE)
+    if (verbose)
       cerr << "min_reads : " << min_reads << endl
            << "max_dist : " << max_dist << endl
            << "input_filename : " << input_filename << endl
            << "input_filesize : " << input_filesize << endl;
 
-    std::ifstream in(input_filename);
-    if (!in)
-      throw std::runtime_error("bad input file: " + input_filename);
+    vector<sum_stats> the_stats(max_dist + 1);
 
-    vector<MSite> sites;
-    MSite the_site;
-    string prev_chrom;
-
-    // a pair of vectors for each distance in the range of interest;
-    // each pair of vectors includes each pair of values at the
-    // corresponding distance
-    vector<vector<double> > X(max_dist + 1), Y(max_dist + 1);
-
-    vector<SimpleGenomicRegion> regions;
+    vector<genomic_interval> regions;
     if (!regions_file.empty()) {
+      if (verbose)
+        cerr << "loading regions: " << regions_file << endl;
       load_regions(regions_file, regions);
-      if (VERBOSE)
-        cerr << "loading regions: " << regions.size() << endl;
+      if (verbose)
+        cerr << "total regions: " << regions.size() << endl;
     }
-    size_t region_idx_add = 0;
-    size_t region_idx_process = 0;
 
-    while (in >> the_site) {
-      if (the_site.chrom != prev_chrom) {
-        process_chrom(require_same_region, regions, region_idx_process,
-                      min_reads, max_dist, window_size, sites,
-                      the_neighbor, strand, X, Y);
-        if (PROGRESS)
-          cerr << "processing: " << the_site.chrom << endl;
-        sites.clear();
-      }
-      if (regions.empty() || site_allowed(regions, the_site, region_idx_add))
-        sites.push_back(the_site);
-      prev_chrom.swap(the_site.chrom);
-    }
-    process_chrom(require_same_region, regions, region_idx_process,
-                  min_reads, max_dist, window_size, sites,
-                  the_neighbor, strand, X, Y);
+    if (the_neighbor == 0)
+      process_sites_all_neighbors(report_progress,
+                                  input_filename, require_same_region, regions,
+                                  min_reads, max_dist, window_size, strand,
+                                  the_stats);
+    else
+      process_sites_kth_neighbor(report_progress,
+                                 input_filename, require_same_region, regions,
+                                 min_reads, max_dist, window_size, strand,
+                                 the_neighbor, the_stats);
 
     std::ofstream of;
     if (!outfile.empty()) of.open(outfile);
-    std::ostream out(outfile.empty() ? cout.rdbuf() : of.rdbuf());
+    std::ostream out(outfile.empty() ? std::cout.rdbuf() : of.rdbuf());
 
-    for (size_t i = 1; i < X.size(); ++i)
-      if (X[i].size() >= min_sites) {
-        double sdX = 0.0, sdY = 0.0, covXY = 0.0;
-        const double rXY = corr(X[i], Y[i], sdX, sdY, covXY);
-        const size_t N = X[i].size();
-        out << i << '\t'
-            << rXY << '\t'
-            << N << '\t'
-            << sdX << '\t'
-            << sdY << '\t'
-            << covXY << endl;
-      }
-
-    if (!valfile.empty()) // report (some or all of) the values
-      report_values(valfile, num_val, X, Y);
+    for (size_t i = 1; i <= max_dist; ++i) {
+      double sdX = 0.0, sdY = 0.0, covXY = 0.0;
+      const size_t N = the_stats[i].N;
+      const double rXY = the_stats[i].get_values(sdX, sdY, covXY);
+      if (N >= min_sites)
+        out << i << '\t' << rXY << '\t' << N << '\t'
+            << sdX << '\t' << sdY << '\t' << covXY << endl;
+    }
   }
   catch (std::exception &e) {
     cerr << "ERROR:\t" << e.what() << endl;
