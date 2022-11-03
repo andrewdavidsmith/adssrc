@@ -372,6 +372,8 @@ of N is the number of observations contributing.
     size_t window_size = 0;
     int strand = 0; // code: same=1, different=-1 and any=0
 
+    const double megabytes = 1024*1024;
+
     string regions_file;
 
     bool verbose = false;
@@ -430,10 +432,14 @@ of N is the number of observations contributing.
     const size_t input_filesize = get_filesize(input_filename);
 
     if (verbose)
-      cerr << "min_reads : " << min_reads << endl
-           << "max_dist : " << max_dist << endl
-           << "input_filename : " << input_filename << endl
-           << "input_filesize : " << input_filesize << endl;
+      cerr << "min_reads: " << min_reads << endl
+           << "max_dist: " << max_dist << endl
+           << "min_sites: " << min_sites << endl
+           << "the_neighbor: " << the_neighbor << endl
+           << "input_filename: " << input_filename << endl
+           << "input_filesize: "
+           << std::fixed << std::setprecision(2)
+           << input_filesize/megabytes << "MB" << endl;
 
     vector<sum_stats> the_stats(max_dist + 1);
 
