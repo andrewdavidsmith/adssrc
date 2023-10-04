@@ -18,22 +18,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <string>
-#include <vector>
 #include <iostream>
-#include <fstream>
 #include <array>
+#include <cstdio>
+#include <cstdlib>
 
-#include "OptionParser.hpp"
-
-using std::string;
-using std::vector;
 using std::cout;
 using std::cerr;
-using std::endl;
-using std::runtime_error;
+using std::tolower;
 
-constexpr int nuc_to_idx[] = {
+constexpr std::uint8_t nuc_to_idx[] = {
  /*  0*/  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
  /* 16*/  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
  /* 32*/  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
@@ -54,59 +48,48 @@ constexpr int nuc_to_idx[] = {
 
 int
 main(int argc, const char **argv) {
+  static constexpr auto buf_size = 64u * 1024u;
 
-  try {
-
-    /****************** COMMAND LINE OPTIONS ********************/
-    OptionParser opt_parse("basecomp", "get the base comp",
-                           "<fasta-file>");
-    // opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
-    vector<string> leftover_args;
-    opt_parse.parse(argc, argv, leftover_args);
-    if (argc == 1 || opt_parse.help_requested()) {
-      cerr << opt_parse.help_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    if (opt_parse.about_requested()) {
-      cerr << opt_parse.about_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    if (opt_parse.option_missing()) {
-      cerr << opt_parse.option_missing_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    if (std::size(leftover_args) != 1) {
-      cerr << opt_parse.help_message() << endl;
-      return EXIT_SUCCESS;
-    }
-    const string genome_file = leftover_args.front();
-    /****************** END COMMAND LINE OPTIONS *****************/
-
-    std::array<uint64_t, 256> counter;
-    std::fill_n(begin(counter), 256, 0u);
-
-    std::ifstream in(genome_file);
-    if (!in)
-      throw runtime_error("failed to open file: " + genome_file);
-
-    string line;
-    while (getline(in, line))
-      if (line[0] != '>')
-        for (auto c : line)
-          counter[c]++;
-
-    uint32_t tot = 0u;
-    for (auto i : {'A', 'C', 'G', 'T'})
-      tot += counter[i] + counter[std::tolower(i)];
-
-    for (auto i : {'A', 'C', 'G', 'T'}) {
-      const double denom = counter[i] + counter[std::tolower(i)];
-      cout << static_cast<char>(i) << '\t' << denom/tot << endl;
-    }
-  }
-  catch (const std::runtime_error &e) {
-    cerr << e.what() << endl;
+  if (argc != 2) {
+    std::perror("basecomp <fasta-file>");
     return EXIT_FAILURE;
+  }
+
+  const auto genome_file = argv[1];
+
+  std::array<std::uint_fast64_t, 256> counter;
+  std::fill_n(begin(counter), 256, 0);
+
+  int is_ok = EXIT_FAILURE;
+  FILE *fp = std::fopen(genome_file, "r");
+  if (!fp) {
+    std::perror(genome_file);
+    return is_ok;
+  }
+
+  std::array<uint8_t, 64 * 1024> buf;
+
+  std::int_fast32_t n = 0;
+  while ((n = std::fread(buf.data(), 1, buf_size, fp)) > 0) {
+    auto c = buf.data();
+    // not bother to exclude name lines that start with '>'
+    while (n-- > 0) counter[*c]++;
+  }
+  if (std::ferror(fp)) {
+    std::perror(genome_file);
+    return is_ok;
+  }
+
+  std::fclose(fp);
+
+  std::uint_fast32_t tot = 0;
+  for (auto i : {'A', 'C', 'G', 'T'}) tot += counter[i] + counter[tolower(i)];
+
+  if (tot == 0u) tot = 1u;
+
+  for (auto i : {'A', 'C', 'G', 'T'}) {
+    const double denom = counter[i] + counter[tolower(i)];
+    cout << static_cast<char>(i) << '\t' << denom / tot << '\n';
   }
   return EXIT_SUCCESS;
 }
