@@ -22,7 +22,7 @@ endif
 
 PROGS = collapsebed countoverlaps baseliftover bedgraph_liftover expand_chains \
 	adjust_intervals collapse_bedgraph dataframe-euclidean-dist varyingrows \
-	readliftover collapse3col transpose_data_frame range_search
+	readliftover collapse3col transpose_data_frame range_search basecomp
 
 SOURCES = $(wildcard *.cpp)
 INCLUDEDIRS = $(SMITHLAB_CPP)
@@ -36,7 +36,7 @@ endif
 INCLUDEARGS = $(addprefix -I,$(INCLUDEDIRS))
 
 CXX = g++
-CXXFLAGS = -Wall -Wextra -fmessage-length=72 -std=c++11
+CXXFLAGS = -Wall -Wextra -fmessage-length=72 -std=c++17
 OPTFLAGS = -O2
 DEBUGFLAGS = -g
 
