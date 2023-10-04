@@ -22,6 +22,7 @@
 #include <array>
 #include <cstdio>
 #include <cstdlib>
+#include <cstdint>
 
 using std::cout;
 using std::cerr;
