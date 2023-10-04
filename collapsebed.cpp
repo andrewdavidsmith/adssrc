@@ -298,12 +298,8 @@ main(int argc, const char **argv) {
          std::ostream_iterator<GenomicRegion>(out, "\n"));
 
   }
-  catch (SMITHLABException &e) {
+  catch (std::exception &e) {
     cerr << "ERROR:\t" << e.what() << endl;
-    return EXIT_FAILURE;
-  }
-  catch (std::bad_alloc &ba) {
-    cerr << "ERROR: could not allocate memory" << endl;
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

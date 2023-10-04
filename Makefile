@@ -63,7 +63,7 @@ smoothmeth: $(addprefix $(METHPIPE_ROOT)/src/common/, TwoStateHMM.o)
 
 reorder:    $(addprefix $(SMITHLAB_CPP)/, MappedRead.o)
 
-autocorr: $(addprefix $(METHPIPE_ROOT)/src/common/, MethpipeSite.o)
+autocorr: $(addprefix $(METHPIPE_ROOT)/src/common/, MSite.o)
 
 expand_chains: chain_file_utils.o
 
